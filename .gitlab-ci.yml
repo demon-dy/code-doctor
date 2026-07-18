@@ -1,0 +1,17 @@
+image: node:22-alpine
+
+stages:
+  - test
+
+check:
+  stage: test
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+  script:
+    - npm run check

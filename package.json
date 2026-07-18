@@ -1,0 +1,35 @@
+{
+  "name": "@thunder/code-doctor",
+  "version": "0.1.0",
+  "description": "每天修复一个历史代码问题，并生成客户端到服务端的静态调用图",
+  "type": "module",
+  "bin": {
+    "code-doctor": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "dev": "tsx src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "minimatch": "^10.2.4",
+    "picocolors": "^1.1.1",
+    "typescript": "^6.0.2",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.13",
+    "tsx": "^4.21.0",
+    "vitest": "^4.0.18"
+  }
+}
