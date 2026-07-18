@@ -86,7 +86,7 @@ if (prompt.includes('discover-task.json')) {
     expect(mapHtml).toContain("kind-decision");
     expect(mapHtml).toContain("panOnScroll");
     expect(mapHtml).toContain("zoomOnPinch");
-    expect(mapHtml).toContain("edge-label");
+    expect(mapHtml).toContain("path-label-node");
     expect(() => new vm.Script(mapHtml.match(/<script>([\s\S]*)<\/script>/)?.[1] ?? "")).not.toThrow();
     expect(built.knowledge?.id).toBe("home-popup");
     expect((await listScenarios(root))[0]).toMatchObject({ id: "home-popup", status: "candidate", candidateAvailable: true });

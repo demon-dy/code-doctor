@@ -6,7 +6,6 @@ import {
   BackgroundVariant,
   BaseEdge,
   Controls,
-  EdgeLabelRenderer,
   Handle,
   MarkerType,
   MiniMap,
@@ -45,12 +44,30 @@ const statusMeta = {
   conflicted: { label: "证据冲突", short: "冲突" },
 };
 
-const createInitialNodes = () => map.nodes.map((node) => ({
-  id: node.id,
-  type: node.kind,
-  position: { x: 0, y: 0 },
-  data: { businessNode: node },
-}));
+const pathLabelId = (edgeId) => `__path_label__${edgeId}`;
+const edgeHasLabel = (edge) => Boolean(edge.guard || edge.label);
+const layoutConnections = map.edges.flatMap((edge) => edgeHasLabel(edge)
+  ? [
+    { id: `${edge.id}::in`, from: edge.from, to: pathLabelId(edge.id), businessEdge: edge },
+    { id: `${edge.id}::out`, from: pathLabelId(edge.id), to: edge.to, businessEdge: edge },
+  ]
+  : [{ id: edge.id, from: edge.from, to: edge.to, businessEdge: edge }]);
+
+const createInitialNodes = () => [
+  ...map.nodes.map((node) => ({
+    id: node.id,
+    type: node.kind,
+    position: { x: 0, y: 0 },
+    data: { businessNode: node },
+  })),
+  ...map.edges.filter(edgeHasLabel).map((edge) => ({
+    id: pathLabelId(edge.id),
+    type: "path_label",
+    position: { x: 0, y: 0 },
+    data: { pathEdge: edge },
+    draggable: false,
+  })),
+];
 
 const layoutGraph = async (currentNodes) => {
   const children = currentNodes.map((node) => ({
@@ -64,13 +81,13 @@ const layoutGraph = async (currentNodes) => {
       "elk.algorithm": "layered",
       "elk.direction": "RIGHT",
       "elk.edgeRouting": "ORTHOGONAL",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "120",
-      "elk.spacing.nodeNode": "56",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "92",
+      "elk.spacing.nodeNode": "52",
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
       "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
     },
     children,
-    edges: map.edges.map((edge) => ({ id: edge.id, sources: [edge.from], targets: [edge.to] })),
+    edges: layoutConnections.map((edge) => ({ id: edge.id, sources: [edge.from], targets: [edge.to] })),
   });
   const positions = new Map((graph.children ?? []).map((node) => [node.id, node]));
   return currentNodes.map((node) => {
@@ -102,29 +119,27 @@ const BusinessNode = memo(({ data, selected }) => {
   );
 });
 
-const nodeTypes = Object.fromEntries(Object.keys(kindMeta).map((kind) => [kind, BusinessNode]));
-
-const BusinessPathEdge = memo(({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, data, selected }) => {
-  const [edgePath, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 6, offset: 24 });
-  const edge = data.businessEdge;
-  const label = edge.guard || edge.label;
+const PathLabelNode = memo(({ data, selected }) => {
+  const edge = data.pathEdge;
+  const status = statusMeta[edge.status] ?? { label: edge.status, short: edge.status };
   return (
-    <>
-      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} interactionWidth={24} />
-      {label && (
-        <EdgeLabelRenderer>
-          <button
-            type="button"
-            className={`edge-label nodrag nopan status-${edge.status} ${selected ? "is-selected" : ""}`}
-            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            onClick={(event) => { event.stopPropagation(); data.onSelect(id); }}
-          >
-            {label}
-          </button>
-        </EdgeLabelRenderer>
-      )}
-    </>
+    <div className={`path-label-node status-${edge.status} ${selected ? "is-selected" : ""}`} aria-label={`路径条件：${edge.guard || edge.label}，${status.label}`}>
+      <Handle className="path-label-handle target" type="target" position={Position.Left} />
+      <div className="path-label-heading"><span>路径条件</span><b>{status.short}</b></div>
+      <div className="path-label-text">{edge.guard || edge.label}</div>
+      <Handle className="path-label-handle source" type="source" position={Position.Right} />
+    </div>
   );
+});
+
+const nodeTypes = {
+  ...Object.fromEntries(Object.keys(kindMeta).map((kind) => [kind, BusinessNode])),
+  path_label: PathLabelNode,
+};
+
+const BusinessPathEdge = memo(({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style }) => {
+  const [edgePath] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 6, offset: 24 });
+  return <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} interactionWidth={24} />;
 });
 
 const edgeTypes = { business: BusinessPathEdge };
@@ -276,22 +291,32 @@ function MapCanvas({ selection, setSelection, focusMode }) {
     return () => { mounted = false; };
   }, [nodesInitialized, isLayouted]);
 
-  const nodes = useMemo(() => baseNodes.map((node) => ({
-    ...node,
-    selected: selection?.type === "node" && selection.id === node.id,
-    className: !isLayouted ? "is-preparing" : reachability && !reachability.nodes.has(node.id) ? "is-dimmed" : "is-emphasized",
-  })), [baseNodes, selection, reachability, isLayouted]);
+  const nodes = useMemo(() => baseNodes.map((node) => {
+    const pathEdge = node.data.pathEdge;
+    const active = pathEdge ? !reachability || reachability.edges.has(pathEdge.id) : !reachability || reachability.nodes.has(node.id);
+    const selected = pathEdge
+      ? selection?.type === "edge" && selection.id === pathEdge.id
+      : selection?.type === "node" && selection.id === node.id;
+    return {
+      ...node,
+      selected,
+      className: !isLayouted ? "is-preparing" : active ? "is-emphasized" : "is-dimmed",
+    };
+  }), [baseNodes, selection, reachability, isLayouted]);
 
-  const edges = useMemo(() => map.edges.map((edge) => {
+  const edges = useMemo(() => layoutConnections.map((connection) => {
+    const edge = connection.businessEdge;
     const active = !reachability || reachability.edges.has(edge.id);
     const edgeColor = ({ fact: "#58635e", confirmed: "#37699b", inference: "#a76a20", unknown: "#77736a", conflicted: "#b1443f" })[edge.status] ?? "#58635e";
     return {
-      id: edge.id,
-      source: edge.from,
-      target: edge.to,
+      id: connection.id,
+      source: connection.from,
+      target: connection.to,
       type: "business",
-      data: { businessEdge: edge, onSelect: (id) => setSelection({ type: "edge", id }) },
-      markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color: edgeColor },
+      data: { businessEdge: edge },
+      markerEnd: connection.id.endsWith("::in")
+        ? undefined
+        : { type: MarkerType.ArrowClosed, width: 18, height: 18, color: edgeColor },
       className: `evidence-${edge.status} ${!isLayouted ? "is-preparing" : active ? "is-emphasized" : "is-dimmed"}`,
       selected: selection?.type === "edge" && selection.id === edge.id,
       selectable: true,
@@ -302,6 +327,11 @@ function MapCanvas({ selection, setSelection, focusMode }) {
     if (!selection || !baseNodes.length) return;
     if (selection.type === "node") {
       requestAnimationFrame(() => centerNode(baseNodes.find((node) => node.id === selection.id)));
+      return;
+    }
+    const labelNode = baseNodes.find((node) => node.id === pathLabelId(selection.id));
+    if (labelNode) {
+      requestAnimationFrame(() => centerNode(labelNode));
       return;
     }
     const selectedEdge = map.edges.find((edge) => edge.id === selection.id);
@@ -320,7 +350,7 @@ function MapCanvas({ selection, setSelection, focusMode }) {
 
   const miniMapColor = (node) => ({
     actor: "#7b6aa8", scenario: "#375f8b", action: "#31715f", decision: "#a16b2b",
-    state: "#4d7290", system: "#667080", outcome: "#477a4d", side_effect: "#8b6570",
+    state: "#4d7290", system: "#667080", outcome: "#477a4d", side_effect: "#8b6570", path_label: "#c6bda9",
   })[node.type] ?? "#777";
 
   return (
@@ -330,8 +360,10 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
       onNodesChange={(changes) => setBaseNodes((current) => applyNodeChanges(changes, current))}
-      onNodeClick={(_, node) => setSelection({ type: "node", id: node.id })}
-      onEdgeClick={(_, edge) => setSelection({ type: "edge", id: edge.id })}
+      onNodeClick={(_, node) => node.data.pathEdge
+        ? setSelection({ type: "edge", id: node.data.pathEdge.id })
+        : setSelection({ type: "node", id: node.id })}
+      onEdgeClick={(_, edge) => setSelection({ type: "edge", id: edge.data.businessEdge.id })}
       onPaneClick={() => setSelection(null)}
       minZoom={0.08}
       maxZoom={2}

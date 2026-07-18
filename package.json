@@ -1,6 +1,6 @@
 {
   "name": "@thunder-doctor/code-doctor",
-  "version": "0.4.4",
+  "version": "0.4.5",
   "description": "AI 业务代码审计系统：生成可追溯业务地图，用自然语言需求检查真实代码行为",
   "repository": {
     "type": "git",

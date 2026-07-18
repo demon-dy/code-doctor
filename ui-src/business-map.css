@@ -78,11 +78,6 @@ button { color: inherit; }
 .react-flow__edge.evidence-unknown .react-flow__edge-path { stroke: var(--unknown); stroke-dasharray: 2 5; }
 .react-flow__edge.evidence-conflicted .react-flow__edge-path { stroke: var(--conflicted); stroke-width: 3; stroke-dasharray: 12 4 2 4; }
 .react-flow__edge.selected .react-flow__edge-path { stroke-width: 4; }
-.edge-label { position: absolute; z-index: 6; width: max-content; max-width: 230px; padding: 5px 8px; border: 1px solid #c9c5ba; border-radius: 3px; background: rgba(255, 253, 248, .98); color: #444a45; font-size: 10px; font-weight: 680; line-height: 1.45; text-align: left; white-space: normal; overflow-wrap: anywhere; box-shadow: 0 2px 6px rgba(48, 45, 38, .08); cursor: pointer; transform-origin: center; }
-.edge-label:hover, .edge-label.is-selected { z-index: 8; border-color: currentColor; box-shadow: 0 4px 12px rgba(48, 45, 38, .16); }
-.edge-label.status-inference { border-style: dashed; }
-.edge-label.status-unknown { border-style: dotted; }
-.edge-label.status-conflicted { border-width: 2px; }
 .react-flow__controls { overflow: hidden; border: 1px solid var(--line); border-radius: 0; box-shadow: none; }
 .react-flow__controls-button { border-bottom-color: var(--line); background: var(--panel); }
 .react-flow__minimap { border: 1px solid var(--line); border-radius: 0; background: #e9e6de; box-shadow: none; }
@@ -97,6 +92,16 @@ button { color: inherit; }
 .node-title { margin-top: 9px; font-size: 14px; font-weight: 750; line-height: 1.35; overflow-wrap: anywhere; }
 .node-summary { margin-top: 7px; color: #5f655f; font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
 .business-handle { width: 9px; height: 9px; border: 2px solid #fffefa; background: #515c57; }
+.path-label-node { position: relative; width: 210px; padding: 9px 11px 10px; border: 1px solid currentColor; border-radius: 3px; background: #fffdf8; box-shadow: 0 3px 9px rgba(48, 45, 38, .07); cursor: pointer; }
+.path-label-node:hover, .path-label-node.is-selected { box-shadow: 0 5px 14px rgba(48, 45, 38, .15); }
+.path-label-node.is-selected { outline: 3px solid color-mix(in srgb, currentColor 20%, transparent); outline-offset: 3px; }
+.path-label-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #777269; font-size: 8px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.path-label-heading b { color: currentColor; font-size: 8px; }
+.path-label-text { margin-top: 5px; color: #424742; font-size: 10px; font-weight: 680; line-height: 1.5; overflow-wrap: anywhere; }
+.path-label-handle { width: 7px; height: 7px; border: 2px solid #fffdf8; background: currentColor; }
+.path-label-node.status-inference { border-style: dashed; }
+.path-label-node.status-unknown { border-style: dotted; }
+.path-label-node.status-conflicted { border-width: 2px; }
 .kind-actor { color: #715d91; }
 .business-node.kind-actor { border-radius: 44px 8px 8px 44px; background: #f6f1fb; }
 .business-node.kind-actor { width: 276px; padding-left: 28px; }
