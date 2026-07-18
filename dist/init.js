@@ -35,7 +35,7 @@ const CI_JOB = `code-doctor-daily:
   variables:
     GIT_DEPTH: "0"
   before_script:
-    - npm install --global "https://github.com/demon-dy/code-doctor/archive/refs/tags/v0.1.2.tar.gz"
+    - npm install --global @thunder-doctor/code-doctor
   script:
     - code-doctor run --one --open-mr
   artifacts:

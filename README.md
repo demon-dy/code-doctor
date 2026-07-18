@@ -4,7 +4,7 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 
 它是一个轻量 CLI：复用项目已有扫描器，每次只选择一个问题交给 Codex、Claude Code 或自定义 Agent 修复；验证通过后创建 GitLab MR，并生成可搜索的 TS/Go 静态调用图供人类审核和排障。
 
-本项目采用 MIT License，可供团队和社区自由使用。目前可以从 GitHub 安装；`@thunder/code-doctor` 的 npmjs 公共包将在取得 `@thunder` scope 发布权限后提供。
+本项目采用 MIT License，可供团队和社区自由使用，并以 `@thunder-doctor/code-doctor` 发布到 npmjs。
 
 ## 当前能力
 
@@ -20,7 +20,7 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 ## 快速开始
 
 ```bash
-npm install --global "https://github.com/demon-dy/code-doctor/archive/refs/tags/v0.1.2.tar.gz"
+npm install --global @thunder-doctor/code-doctor
 
 cd your-project
 code-doctor init
