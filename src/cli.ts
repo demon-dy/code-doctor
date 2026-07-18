@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import path from "node:path";
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import pc from "picocolors";
 import { loadConfig } from "./config.js";
@@ -13,11 +14,12 @@ const rootOption = (command: Command): Command =>
   command.option("-C, --root <directory>", "项目根目录", process.cwd());
 
 const resolveRoot = (value: string): string => path.resolve(value);
+const packageVersion = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
 
 const program = new Command()
   .name("code-doctor")
   .description("每天修复一个历史代码问题，并生成客户端到服务端的调用图")
-  .version("0.1.0");
+  .version(packageVersion);
 
 rootOption(program.command("init").description("初始化 code-doctor.yaml 和忽略规则"))
   .action(async (options: { root: string }) => {

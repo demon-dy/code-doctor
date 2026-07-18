@@ -44,7 +44,9 @@ const CI_JOB = `code-doctor-daily:
   before_script:
     - npm config set @thunder:registry "https://g.ktvsky.com/api/v4/projects/2088/packages/npm/"
     - npm config set -- "//g.ktvsky.com/api/v4/projects/2088/packages/npm/:_authToken" "\${CI_JOB_TOKEN}"
-    - npm install --global @thunder/code-doctor
+    - CODE_DOCTOR_TARBALL="$(npm pack --silent @thunder/code-doctor)"
+    - npm install --global "./\${CODE_DOCTOR_TARBALL}"
+    - rm -f "\${CODE_DOCTOR_TARBALL}"
   script:
     - code-doctor run --one --open-mr
   artifacts:

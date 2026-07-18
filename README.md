@@ -20,7 +20,9 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 ```bash
 npm config set @thunder:registry "https://g.ktvsky.com/api/v4/projects/2088/packages/npm/"
 npm config set -- "//g.ktvsky.com/api/v4/projects/2088/packages/npm/:_authToken" "$GITLAB_TOKEN"
-npm install --global @thunder/code-doctor
+CODE_DOCTOR_TARBALL="$(npm pack --silent @thunder/code-doctor)"
+npm install --global "./$CODE_DOCTOR_TARBALL"
+rm -f "$CODE_DOCTOR_TARBALL"
 
 cd your-project
 code-doctor init
@@ -117,6 +119,8 @@ code-doctor ci install
 - 目标项目依赖和测试环境。
 
 默认模板通过 `CI_JOB_TOKEN` 从 GitLab npm Package Registry 安装。如果目标项目没有跨项目读取权限，需要在 Code Doctor 项目的 Job Token allowlist 中加入目标项目，或改用具备 `read_package_registry` 权限的 Deploy Token。
+
+当前公司 GitLab 为 13.12，该版本的 npm Registry 元数据响应不包含 `bin` 字段；直接执行 `npm install --global @thunder/code-doctor` 不会创建命令链接。因此安装流程先用 `npm pack` 下载发布包，再从 tarball 安装。升级 GitLab 后可恢复为标准的一行安装命令。
 
 系统不会自动合并 MR。
 
