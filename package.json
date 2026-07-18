@@ -18,7 +18,6 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "prepare": "npm run build",
     "release": "npm run check && npm publish --access public --registry=https://registry.npmjs.org",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
