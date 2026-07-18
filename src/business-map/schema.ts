@@ -3,6 +3,7 @@ import path from "node:path";
 import type {
   AgentRunResult,
   BusinessAuditReport,
+  BusinessChapter,
   BusinessEdge,
   BusinessEvidence,
   BusinessFinding,
@@ -44,6 +45,23 @@ const uniqueIds = (values: Array<{ id: string }>, name: string): Set<string> => 
   const ids = new Set(values.map((value) => value.id));
   if (ids.size !== values.length) throw new Error(`${name} 中存在重复 id`);
   return ids;
+};
+
+const fallbackChapters = (nodes: BusinessNode[]): BusinessChapter[] => {
+  const chapterCount = Math.max(1, Math.min(8, Math.ceil(nodes.length / 6)));
+  const chapterSize = Math.ceil(nodes.length / chapterCount);
+  return Array.from({ length: chapterCount }, (_, index) => nodes.slice(index * chapterSize, (index + 1) * chapterSize))
+    .filter((chapterNodes) => chapterNodes.length)
+    .map((chapterNodes, index) => {
+      const first = chapterNodes[0]!;
+      const last = chapterNodes.at(-1)!;
+      return {
+        id: `chapter-${index + 1}`,
+        title: first.id === last.id ? first.label : `${first.label}到${last.label}`,
+        summary: `从“${first.label}”推进到“${last.label}”的业务阶段。`,
+        nodeIds: chapterNodes.map((node) => node.id),
+      };
+    });
 };
 
 const validateLocation = async (root: string, evidence: BusinessEvidence): Promise<void> => {
@@ -131,6 +149,31 @@ export const finalizeBusinessMap = async (input: {
   });
   const nodeIds = uniqueIds(nodes, "nodes");
 
+  let chapters: BusinessChapter[];
+  if (Array.isArray(candidate.chapters) && candidate.chapters.length) {
+    if (candidate.chapters.length > 9) throw new Error("业务章节不能超过 9 个");
+    chapters = candidate.chapters.map((value, index) => {
+      const item = object(value, `chapters[${index}]`);
+      const chapterNodeIds = strings(item.nodeIds, `chapters[${index}].nodeIds`);
+      if (!chapterNodeIds.length) throw new Error(`业务章节 ${item.id ?? index} 不能是空章节`);
+      for (const id of chapterNodeIds) if (!nodeIds.has(id)) throw new Error(`业务章节引用了不存在的节点：${id}`);
+      return {
+        id: string(item.id, `chapters[${index}].id`),
+        title: string(item.title, `chapters[${index}].title`),
+        summary: string(item.summary, `chapters[${index}].summary`),
+        nodeIds: chapterNodeIds,
+      };
+    });
+    uniqueIds(chapters, "chapters");
+    const covered = chapters.flatMap((chapter) => chapter.nodeIds);
+    const uniqueCovered = new Set(covered);
+    if (uniqueCovered.size !== covered.length) throw new Error("同一个业务节点不能重复出现在多个章节中");
+    const missing = nodes.filter((node) => !uniqueCovered.has(node.id));
+    if (missing.length) throw new Error(`业务章节没有覆盖全部节点：${missing.map((node) => node.id).join(", ")}`);
+  } else {
+    chapters = fallbackChapters(nodes);
+  }
+
   const edges: BusinessEdge[] = rawEdges.map((value, index) => {
     const item = object(value, `edges[${index}]`);
     const from = string(item.from, `edges[${index}].from`);
@@ -164,6 +207,7 @@ export const finalizeBusinessMap = async (input: {
     title: string(candidate.title, "title"),
     focus: input.focus,
     summary: string(candidate.summary, "summary"),
+    chapters,
     nodes,
     edges,
     evidence,

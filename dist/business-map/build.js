@@ -20,8 +20,9 @@ const buildPrompt = (taskFile) => `你是 Code Doctor 的 AI 业务代码审计 
    confirmed 只表示已有 human 证据的人工确认，Agent 不得自行使用 confirmed。
 5. 决策边尽量填写 guard，明确“什么条件导致什么结果”。
 6. 优先生成一张局部、清晰、可排查的图，不要复制整个技术调用图。
-7. 不修改任何业务源码、测试、依赖或 Git 状态。
-8. 将最终 JSON 写入任务指定的 candidateFile。不要只在终端输出 JSON。
+7. 把节点归纳成 4～8 个按业务推进顺序排列的 chapters；标题必须是业务语言。每个节点必须且只能属于一个章节。
+8. 不修改任何业务源码、测试、依赖或 Git 状态。
+9. 将最终 JSON 写入任务指定的 candidateFile。不要只在终端输出 JSON。
 
 JSON 必须满足任务文件中的 outputContract。完成后简要说明读取范围、关键不确定性和输出路径。`;
 export const buildBusinessMap = async (input) => {
@@ -45,6 +46,7 @@ export const buildBusinessMap = async (input) => {
         outputContract: {
             title: "string",
             summary: "string",
+            chapters: [{ id: "string", title: "string", summary: "string", nodeIds: ["node-id"] }],
             nodes: [{ id: "string", label: "string", kind: "scenario|actor|state|decision|action|outcome|side_effect|system", summary: "string", status: "fact|inference|confirmed|unknown|conflicted", evidenceIds: ["string"] }],
             edges: [{ id: "string", from: "node-id", to: "node-id", label: "string?", guard: "string?", status: "fact|inference|confirmed|unknown|conflicted", confidence: "0..1", evidenceIds: ["string"] }],
             evidence: [{ id: "string", kind: "source|test|git|runtime|human|agent", description: "string", location: { file: "project-relative-path", line: "positive integer" }, reference: "string?", confidence: "0..1" }],
@@ -78,6 +80,7 @@ export const buildBusinessMap = async (input) => {
         focus: input.focus,
         agent: map.agent,
         nodes: map.nodes.length,
+        chapters: map.chapters.length,
         edges: map.edges.length,
         evidence: map.evidence.length,
         technicalGraph: graph.stats,

@@ -46,21 +46,41 @@ const statusMeta = {
 
 const pathLabelId = (edgeId) => `__path_label__${edgeId}`;
 const edgeHasLabel = (edge) => Boolean(edge.guard || edge.label);
-const layoutConnections = map.edges.flatMap((edge) => edgeHasLabel(edge)
-  ? [
-    { id: `${edge.id}::in`, from: edge.from, to: pathLabelId(edge.id), businessEdge: edge },
-    { id: `${edge.id}::out`, from: pathLabelId(edge.id), to: edge.to, businessEdge: edge },
-  ]
-  : [{ id: edge.id, from: edge.from, to: edge.to, businessEdge: edge }]);
+const fallbackChapters = () => {
+  const count = Math.max(1, Math.min(8, Math.ceil(map.nodes.length / 6)));
+  const size = Math.ceil(map.nodes.length / count);
+  return Array.from({ length: count }, (_, index) => map.nodes.slice(index * size, (index + 1) * size))
+    .filter((nodes) => nodes.length)
+    .map((nodes, index) => ({
+      id: `chapter-${index + 1}`,
+      title: nodes.length === 1 ? nodes[0].label : `${nodes[0].label}到${nodes.at(-1).label}`,
+      summary: `从“${nodes[0].label}”推进到“${nodes.at(-1).label}”的业务阶段。`,
+      nodeIds: nodes.map((node) => node.id),
+    }));
+};
+const chapters = Array.isArray(map.chapters) && map.chapters.length ? map.chapters : fallbackChapters();
 
-const createInitialNodes = () => [
-  ...map.nodes.map((node) => ({
+const createScope = (chapter) => {
+  const nodeIds = new Set(chapter.nodeIds);
+  const nodes = map.nodes.filter((node) => nodeIds.has(node.id));
+  const edges = map.edges.filter((edge) => nodeIds.has(edge.from) && nodeIds.has(edge.to));
+  const connections = edges.flatMap((edge) => edgeHasLabel(edge)
+    ? [
+      { id: `${edge.id}::in`, from: edge.from, to: pathLabelId(edge.id), businessEdge: edge },
+      { id: `${edge.id}::out`, from: pathLabelId(edge.id), to: edge.to, businessEdge: edge },
+    ]
+    : [{ id: edge.id, from: edge.from, to: edge.to, businessEdge: edge }]);
+  return { nodes, edges, connections };
+};
+
+const createInitialNodes = (scope) => [
+  ...scope.nodes.map((node) => ({
     id: node.id,
     type: node.kind,
     position: { x: 0, y: 0 },
     data: { businessNode: node },
   })),
-  ...map.edges.filter(edgeHasLabel).map((edge) => ({
+  ...scope.edges.filter(edgeHasLabel).map((edge) => ({
     id: pathLabelId(edge.id),
     type: "path_label",
     position: { x: 0, y: 0 },
@@ -69,7 +89,7 @@ const createInitialNodes = () => [
   })),
 ];
 
-const layoutGraph = async (currentNodes) => {
+const layoutGraph = async (currentNodes, connections) => {
   const children = currentNodes.map((node) => ({
     id: node.id,
     width: node.measured?.width ?? 292,
@@ -87,7 +107,7 @@ const layoutGraph = async (currentNodes) => {
       "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
     },
     children,
-    edges: layoutConnections.map((edge) => ({ id: edge.id, sources: [edge.from], targets: [edge.to] })),
+    edges: connections.map((edge) => ({ id: edge.id, sources: [edge.from], targets: [edge.to] })),
   });
   const positions = new Map((graph.children ?? []).map((node) => [node.id, node]));
   return currentNodes.map((node) => {
@@ -147,22 +167,53 @@ const edgeTypes = { business: BusinessPathEdge };
 const evidenceById = new Map(map.evidence.map((item) => [item.id, item]));
 const nodeById = new Map(map.nodes.map((item) => [item.id, item]));
 
-function DetailPanel({ selection, onSelectNode }) {
+function BusinessOverview({ onSelectChapter }) {
+  return (
+    <section className="business-overview">
+      <div className="overview-intro">
+        <div className="eyebrow">第一层 · 业务全景</div>
+        <h2>先理解业务阶段，再进入执行细节</h2>
+        <p>{map.summary}</p>
+      </div>
+      <div className="chapter-index" aria-label="业务章节">
+        {chapters.map((chapter, index) => {
+          const chapterNodes = chapter.nodeIds.map((id) => nodeById.get(id)).filter(Boolean);
+          const facts = chapterNodes.filter((node) => node.status === "fact" || node.status === "confirmed").length;
+          return (
+            <button className="chapter-row" key={chapter.id} onClick={() => onSelectChapter(chapter.id)}>
+              <span className="chapter-number">{String(index + 1).padStart(2, "0")}</span>
+              <span className="chapter-copy">
+                <b>{chapter.title}</b>
+                <span>{chapter.summary}</span>
+                <small>{chapterNodes[0]?.label} <i>→</i> {chapterNodes.at(-1)?.label}</small>
+              </span>
+              <span className="chapter-meta"><b>{chapterNodes.length}</b> 个节点<br />{facts} 个事实</span>
+              <span className="chapter-enter">进入章节 →</span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function DetailPanel({ selection, chapter, onSelectNode }) {
   if (!selection) {
+    const chapterNodes = chapter?.nodeIds.map((id) => nodeById.get(id)).filter(Boolean) ?? [];
     return (
       <aside className="detail-panel">
-        <div className="eyebrow">当前业务场景</div>
-        <h2>{map.title}</h2>
-        <p className="detail-lead">{map.summary}</p>
+        <div className="eyebrow">{chapter ? "第二层 · 场景地图" : "项目业务导览"}</div>
+        <h2>{chapter?.title ?? map.title}</h2>
+        <p className="detail-lead">{chapter?.summary ?? map.summary}</p>
         <dl className="map-stats">
-          <div><dt>{map.nodes.length}</dt><dd>业务节点</dd></div>
-          <div><dt>{map.edges.length}</dt><dd>业务路径</dd></div>
+          <div><dt>{chapter ? chapterNodes.length : chapters.length}</dt><dd>{chapter ? "本章节点" : "业务章节"}</dd></div>
+          <div><dt>{chapter ? map.edges.filter((edge) => chapter.nodeIds.includes(edge.from) && chapter.nodeIds.includes(edge.to)).length : map.nodes.length}</dt><dd>{chapter ? "本章路径" : "业务节点"}</dd></div>
           <div><dt>{map.evidence.length}</dt><dd>代码证据</dd></div>
           <div><dt>{map.uncertainties.length}</dt><dd>待确认项</dd></div>
         </dl>
         <section className="detail-section">
-          <h3>使用方式</h3>
-          <p>选择节点查看完整上下游；选择连线查看触发条件。搜索可以定位业务词、源码文件和证据内容。</p>
+          <h3>{chapter ? "继续下钻" : "建议阅读顺序"}</h3>
+          <p>{chapter ? "选择一个业务节点或路径条件，进入第三层查看完整上下游和代码证据。" : "按章节了解业务推进过程；遇到关心的阶段再进入，不需要从头读完整条执行链。"}</p>
         </section>
       </aside>
     );
@@ -264,12 +315,13 @@ function Legend() {
   );
 }
 
-function MapCanvas({ selection, setSelection, focusMode }) {
-  const [baseNodes, setBaseNodes] = useState(createInitialNodes);
+function MapCanvas({ chapter, selection, setSelection, onBack }) {
+  const scope = useMemo(() => createScope(chapter), [chapter.id]);
+  const [baseNodes, setBaseNodes] = useState(() => createInitialNodes(scope));
   const [isLayouted, setIsLayouted] = useState(false);
   const nodesInitialized = useNodesInitialized();
   const { fitView, getZoom, setCenter } = useReactFlow();
-  const reachability = useMemo(() => collectFocusedSubgraph(map.edges, selection ?? undefined, focusMode), [selection, focusMode]);
+  const reachability = useMemo(() => collectFocusedSubgraph(scope.edges, selection ?? undefined, "full"), [scope.edges, selection]);
 
   const centerNode = (node, minimumZoom = 0.82) => {
     if (!node) return;
@@ -282,7 +334,7 @@ function MapCanvas({ selection, setSelection, focusMode }) {
   useEffect(() => {
     if (!nodesInitialized || isLayouted) return;
     let mounted = true;
-    layoutGraph(baseNodes).then((nodes) => {
+    layoutGraph(baseNodes, scope.connections).then((nodes) => {
       if (!mounted) return;
       setBaseNodes(nodes);
       setIsLayouted(true);
@@ -304,7 +356,7 @@ function MapCanvas({ selection, setSelection, focusMode }) {
     };
   }), [baseNodes, selection, reachability, isLayouted]);
 
-  const edges = useMemo(() => layoutConnections.map((connection) => {
+  const edges = useMemo(() => scope.connections.map((connection) => {
     const edge = connection.businessEdge;
     const active = !reachability || reachability.edges.has(edge.id);
     const edgeColor = ({ fact: "#58635e", confirmed: "#37699b", inference: "#a76a20", unknown: "#77736a", conflicted: "#b1443f" })[edge.status] ?? "#58635e";
@@ -321,7 +373,7 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       selected: selection?.type === "edge" && selection.id === edge.id,
       selectable: true,
     };
-  }), [reachability, selection, isLayouted]);
+  }), [scope.connections, reachability, selection, isLayouted]);
 
   useEffect(() => {
     if (!selection || !baseNodes.length) return;
@@ -346,7 +398,7 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       const y = (source.position.y + sourceHeight / 2 + target.position.y + targetHeight / 2) / 2;
       requestAnimationFrame(() => setCenter(x, y, { zoom: Math.max(getZoom(), 0.72), duration: 420 }));
     }
-  }, [selection?.type, selection?.id, baseNodes.length]);
+  }, [selection?.type, selection?.id, baseNodes.length, isLayouted]);
 
   const miniMapColor = (node) => ({
     actor: "#7b6aa8", scenario: "#375f8b", action: "#31715f", decision: "#a16b2b",
@@ -385,6 +437,7 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       <Legend />
       <Panel position="top-right" className="canvas-actions">
         <span className="gesture-hint">双指平移 · 捏合缩放</span>
+        <button onClick={onBack}>返回业务全景</button>
         <button disabled={!isLayouted} onClick={() => centerNode(baseNodes[0], 0.82)}>回到起点</button>
         <button disabled={!isLayouted} onClick={() => fitView({ padding: 0.16, duration: 480 })}>查看全景</button>
       </Panel>
@@ -400,8 +453,9 @@ function MapCanvas({ selection, setSelection, focusMode }) {
 
 function App() {
   const [selection, setSelection] = useState(null);
-  const [focusMode, setFocusMode] = useState("full");
+  const [chapterId, setChapterId] = useState(null);
   const [query, setQuery] = useState("");
+  const chapter = chapters.find((item) => item.id === chapterId) ?? null;
 
   const results = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -418,17 +472,30 @@ function App() {
   useEffect(() => {
     const onKey = (event) => {
       if (event.key === "Escape") {
-        setSelection(null);
+        if (selection) setSelection(null);
+        else setChapterId(null);
         setQuery("");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [selection]);
 
   const selectNode = (id) => {
+    const ownerChapter = chapters.find((item) => item.nodeIds.includes(id));
+    if (ownerChapter) setChapterId(ownerChapter.id);
     setSelection({ type: "node", id });
     setQuery("");
+  };
+
+  const selectChapter = (id) => {
+    setChapterId(id);
+    setSelection(null);
+  };
+
+  const showOverview = () => {
+    setChapterId(null);
+    setSelection(null);
   };
 
   return (
@@ -438,6 +505,13 @@ function App() {
           <span className="brand">CODE DOCTOR</span>
           <div><h1>{map.title}</h1><p>{map.focus}</p></div>
         </div>
+        <nav className="level-nav" aria-label="业务地图层级">
+          <button className={!chapter ? "active" : ""} onClick={showOverview}>业务全景</button>
+          <span>›</span>
+          <button className={chapter ? "active" : ""} disabled={!chapter}>{chapter?.title ?? "选择章节"}</button>
+          <span>›</span>
+          <span className={selection ? "active" : ""}>{selection ? "链路与证据" : "选择节点"}</span>
+        </nav>
         <div className="topbar-actions">
           <div className="search-box">
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索业务、源码或证据…" aria-label="搜索业务地图" />
@@ -450,20 +524,17 @@ function App() {
               )) : <p>没有找到对应业务节点</p>}
             </div>}
           </div>
-          <div className="mode-switch" aria-label="链路聚焦范围">
-            {[{ id: "full", label: "完整链路" }, { id: "upstream", label: "问题从哪来" }, { id: "downstream", label: "会影响哪里" }].map((mode) => (
-              <button className={focusMode === mode.id ? "active" : ""} key={mode.id} onClick={() => setFocusMode(mode.id)}>{mode.label}</button>
-            ))}
-          </div>
         </div>
       </header>
       <main className="workspace">
         <section className="canvas-shell">
-          <ReactFlowProvider>
-            <MapCanvas selection={selection} setSelection={setSelection} focusMode={focusMode} />
-          </ReactFlowProvider>
+          {chapter ? (
+            <ReactFlowProvider key={chapter.id}>
+              <MapCanvas chapter={chapter} selection={selection} setSelection={setSelection} onBack={showOverview} />
+            </ReactFlowProvider>
+          ) : <BusinessOverview onSelectChapter={selectChapter} />}
         </section>
-        <DetailPanel selection={selection} onSelectNode={selectNode} />
+        <DetailPanel selection={selection} chapter={chapter} onSelectNode={selectNode} />
       </main>
     </div>
   );

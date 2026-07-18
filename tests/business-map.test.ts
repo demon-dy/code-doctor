@@ -42,6 +42,7 @@ if (prompt.includes('discover-task.json')) {
   const task = JSON.parse(fs.readFileSync('.code-doctor/map-task.json', 'utf8'));
   fs.writeFileSync(task.candidateFile, JSON.stringify({
     title: '弹窗业务', summary: '根据会员到期状态选择弹窗',
+    chapters: [{ id: 'chapter.popup', title: '首页弹窗决策', summary: '进入首页后判断会员状态并选择弹窗', nodeIds: ['scenario.popup', 'decision.expired', 'outcome.renew'] }],
     nodes: [
       { id: 'scenario.popup', label: '进入首页', kind: 'scenario', summary: '用户进入首页后检查弹窗', status: 'inference', evidenceIds: ['src.popup'] },
       { id: 'decision.expired', label: '会员是否到期', kind: 'decision', summary: '根据 expired 决定结果', status: 'fact', evidenceIds: ['src.popup'] },
@@ -77,6 +78,7 @@ if (prompt.includes('discover-task.json')) {
     expect(await fs.readFile(path.join(root, ".code-doctor", "knowledge", "project.candidate.yaml"), "utf8")).toContain("一个根据会员状态选择弹窗的应用");
     const built = await buildBusinessMap({ root, config, focus: "首页弹窗", scenarioId: "home-popup" });
     expect(built.map.nodes).toHaveLength(3);
+    expect(built.map.chapters).toEqual([expect.objectContaining({ id: "chapter.popup", nodeIds: ["scenario.popup", "decision.expired", "outcome.renew"] })]);
     expect(built.map.evidence[0]?.location).toEqual({ file: "app.ts", line: 1, column: undefined });
     const mapHtml = await fs.readFile(built.htmlFile, "utf8");
     expect(mapHtml).toContain("AI 业务地图");
@@ -87,6 +89,9 @@ if (prompt.includes('discover-task.json')) {
     expect(mapHtml).toContain("panOnScroll");
     expect(mapHtml).toContain("zoomOnPinch");
     expect(mapHtml).toContain("path-label-node");
+    expect(mapHtml).toContain("business-overview");
+    expect(mapHtml).toContain("level-nav");
+    expect(mapHtml).not.toContain("mode-switch");
     expect(() => new vm.Script(mapHtml.match(/<script>([\s\S]*)<\/script>/)?.[1] ?? "")).not.toThrow();
     expect(built.knowledge?.id).toBe("home-popup");
     expect((await listScenarios(root))[0]).toMatchObject({ id: "home-popup", status: "candidate", candidateAvailable: true });

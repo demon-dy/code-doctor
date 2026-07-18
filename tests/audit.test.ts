@@ -32,7 +32,8 @@ if (prompt.includes('map-task.json')) {
 `, "utf8");
     await runCommand({ command: "git init -b main && git config user.name 'Test' && git config user.email 'test@example.com' && git add app.ts agent.mjs && git commit -m baseline", cwd: root });
     const config = { ...DEFAULT_CONFIG, agent: { provider: "custom" as const, command: "node agent.mjs {promptFile}" }, graph: { ...DEFAULT_CONFIG.graph, include: ["**/*.ts"] } };
-    await buildBusinessMap({ root, config, focus: "续费弹窗", scenarioId: "vip-renewal" });
+    const built = await buildBusinessMap({ root, config, focus: "续费弹窗", scenarioId: "vip-renewal" });
+    expect(built.map.chapters).toEqual([expect.objectContaining({ nodeIds: ["decision.expired", "outcome.renew"] })]);
     await confirmScenario({ root, id: "vip-renewal", reviewer: "owner" });
     await addConfirmedRule({ root, id: "vip-daily-once", scenarioId: "vip-renewal", statement: "会员过期弹窗每天最多展示一次", reviewer: "owner" });
     await fs.writeFile(path.join(root, "app.ts"), "export const popup = (expired: boolean) => expired === true ? 'renew' : 'none';\n", "utf8");

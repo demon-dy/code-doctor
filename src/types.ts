@@ -165,6 +165,13 @@ export interface BusinessEdge {
   evidenceIds: string[];
 }
 
+export interface BusinessChapter {
+  id: string;
+  title: string;
+  summary: string;
+  nodeIds: string[];
+}
+
 export interface BusinessMap {
   schemaVersion: 1;
   createdAt: string;
@@ -172,6 +179,7 @@ export interface BusinessMap {
   title: string;
   focus: string;
   summary: string;
+  chapters: BusinessChapter[];
   nodes: BusinessNode[];
   edges: BusinessEdge[];
   evidence: BusinessEvidence[];
