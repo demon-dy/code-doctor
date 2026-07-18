@@ -1,6 +1,6 @@
 {
   "name": "@thunder-doctor/code-doctor",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI 业务代码审计系统：生成可追溯业务地图，用自然语言需求检查真实代码行为",
   "repository": {
     "type": "git",
@@ -17,7 +17,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npm run build:ui && tsc -p tsconfig.build.json",
+    "build:ui": "node scripts/build-business-map-ui.mjs",
     "release": "npm run check && npm publish --access public --registry=https://registry.npmjs.org",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
@@ -36,6 +37,13 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.13",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@xyflow/react": "^12.11.2",
+    "elkjs": "^0.12.0",
+    "esbuild": "^0.28.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "tsx": "^4.21.0",
     "vitest": "^4.0.18"
   }

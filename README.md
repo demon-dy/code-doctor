@@ -134,11 +134,22 @@ code-doctor map build --focus "首页开屏弹窗的选择、优先级与展示�
 .code-doctor/output/
 ├── graph.json                 # 底层技术证据图
 ├── business-map.json          # 结构化业务地图
-├── business-map.html          # 人类可读的分层地图
+├── business-map.html          # 可离线打开的交互式业务画布
 ├── map-run.json               # Agent 和本次建图审计记录
 ├── map-agent-stdout.jsonl
 └── map-agent-stderr.log
 ```
+
+`business-map.html` 是一个自包含的 React Flow 无限画布，不依赖业务项目启动服务或访问 CDN。它提供：
+
+- ELK 从左到右自动布局、缩放、拖拽、MiniMap 和全景恢复；
+- 角色、场景、动作、判断、状态、系统、结果、副作用八类节点样式；
+- 固定图例，分开表达节点类型与代码事实、人工确认、AI 推断、未知和证据冲突；
+- 点击节点或路径后聚焦完整上下游，并可切换“问题从哪来”和“会影响哪里”；
+- 按业务词、源码文件或证据内容搜索，选择结果后定位到对应链路；
+- 右侧查看路径条件、置信度、源码文件与行号证据。
+
+节点位置只属于当前浏览视图，不会写回业务知识；地图仍由结构化 JSON、源码证据和人工确认决定。
 
 然后使用人类需求检查实际实现：
 

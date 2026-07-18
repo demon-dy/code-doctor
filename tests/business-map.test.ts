@@ -80,6 +80,10 @@ if (prompt.includes('discover-task.json')) {
     expect(built.map.evidence[0]?.location).toEqual({ file: "app.ts", line: 1, column: undefined });
     const mapHtml = await fs.readFile(built.htmlFile, "utf8");
     expect(mapHtml).toContain("AI 业务地图");
+    expect(mapHtml).toContain("code-doctor-map-root");
+    expect(mapHtml).toContain("react-flow");
+    expect(mapHtml).toContain("legend-panel");
+    expect(mapHtml).toContain("kind-decision");
     expect(() => new vm.Script(mapHtml.match(/<script>([\s\S]*)<\/script>/)?.[1] ?? "")).not.toThrow();
     expect(built.knowledge?.id).toBe("home-popup");
     expect((await listScenarios(root))[0]).toMatchObject({ id: "home-popup", status: "candidate", candidateAvailable: true });

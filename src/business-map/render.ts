@@ -1,4 +1,5 @@
 import type { BusinessAuditReport, BusinessMap } from "../types.js";
+import { BUSINESS_MAP_UI_CSS, BUSINESS_MAP_UI_JS } from "./ui-bundle.js";
 
 const safeJson = (value: unknown): string => JSON.stringify(value).replaceAll("<", "\\u003c");
 const esc = (value: string): string => value.replace(/[&<>"']/g, (character) => ({
@@ -21,21 +22,19 @@ const shell = (title: string, body: string, script: string): string => `<!doctyp
 
 export const renderBusinessMap = (map: BusinessMap): string => {
   const data = safeJson(map);
-  return shell(
-    `Code Doctor · ${esc(map.title)}`,
-    `<header><h1>CODE DOCTOR / AI 业务地图</h1><div class="sub">${esc(map.title)} · 聚焦：${esc(map.focus)}</div></header>
-    <div class="layout"><main><div class="toolbar"><input id="search" placeholder="搜索场景、状态、判断、结果…"></div><div class="board" id="board"><svg id="wires"></svg></div></main><aside id="detail"><div class="detail-title">${esc(map.title)}</div><p>${esc(map.summary)}</p><div class="section"><div class="label">地图原则</div><p class="empty">实线表示事实或人工确认，虚线表示 AI 推断或未知。点击节点查看源码证据。</p></div></aside></div>`,
-    `const map=${data};
-const groups=[{title:'角色与场景',kinds:['actor','scenario']},{title:'状态与判断',kinds:['state','decision']},{title:'动作与系统',kinds:['action','system']},{title:'结果与副作用',kinds:['outcome','side_effect']}];
-const board=document.querySelector('#board'),detail=document.querySelector('#detail'),search=document.querySelector('#search'),wires=document.querySelector('#wires');
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const byId=new Map(map.nodes.map(n=>[n.id,n])), evidence=new Map(map.evidence.map(e=>[e.id,e])), elements=new Map();
-groups.forEach(group=>{const col=document.createElement('section');col.className='column';col.innerHTML='<h2>'+group.title+'</h2>';map.nodes.filter(n=>group.kinds.includes(n.kind)).forEach(n=>{const el=document.createElement('article');el.className='card';el.dataset.id=n.id;el.dataset.status=n.status;el.innerHTML='<div class="kind">'+esc(n.kind)+' · '+esc(n.status)+'</div><div class="name">'+esc(n.label)+'</div><div class="summary">'+esc(n.summary)+'</div>';el.onclick=()=>show(n);col.append(el);elements.set(n.id,el)});board.append(col)});
-function draw(){wires.innerHTML='<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#58697c"/></marker></defs>';const base=board.getBoundingClientRect();map.edges.forEach(edge=>{const a=elements.get(edge.from),b=elements.get(edge.to);if(!a||!b||a.classList.contains('dim')||b.classList.contains('dim'))return;const ar=a.getBoundingClientRect(),br=b.getBoundingClientRect(),x1=ar.right-base.left,y1=ar.top+ar.height/2-base.top,x2=br.left-base.left,y2=br.top+br.height/2-base.top;const dx=Math.max(34,(x2-x1)*.45);const p=document.createElementNS('http://www.w3.org/2000/svg','path');p.setAttribute('d','M'+x1+' '+y1+' C'+(x1+dx)+' '+y1+' '+(x2-dx)+' '+y2+' '+x2+' '+y2);p.setAttribute('class','wire '+edge.status);p.setAttribute('marker-end','url(#arrow)');wires.append(p)})}
-function show(node){document.querySelectorAll('.card').forEach(el=>el.classList.toggle('active',el.dataset.id===node.id));const related=map.edges.filter(e=>e.from===node.id||e.to===node.id);detail.innerHTML='<div class="detail-title">'+esc(node.label)+'</div><span class="badge">'+esc(node.kind)+'</span><span class="badge">'+esc(node.status)+'</span><p>'+esc(node.summary)+'</p><div class="section"><div class="label">业务路径</div>'+related.map(e=>'<div class="evidence">'+(e.from===node.id?'→ ':'← ')+esc(byId.get(e.from===node.id?e.to:e.from)?.label)+'<br><span class="empty">'+esc(e.guard||e.label||'未标注条件')+' · '+Math.round(e.confidence*100)+'%</span></div>').join('')+'</div><div class="section"><div class="label">证据</div>'+node.evidenceIds.map(id=>{const e=evidence.get(id);return e?'<div class="evidence"><strong>'+esc(e.kind)+'</strong> · '+Math.round(e.confidence*100)+'%<br>'+esc(e.description)+(e.location?'<div class="source">'+esc(e.location.file)+(e.location.line?':'+e.location.line:'')+'</div>':'')+'</div>':''}).join('')+'</div>'}
-search.oninput=()=>{const q=search.value.trim().toLowerCase();elements.forEach((el,id)=>{const n=byId.get(id);el.classList.toggle('dim',!!q&&!((n.label+' '+n.summary+' '+n.kind).toLowerCase().includes(q))) });draw()};
-new ResizeObserver(draw).observe(board);requestAnimationFrame(draw);`,
-  );
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Code Doctor · ${esc(map.title)}</title>
+  <style>${BUSINESS_MAP_UI_CSS}</style>
+</head>
+<body>
+  <div id="code-doctor-map-root" aria-label="AI 业务地图"></div>
+  <script>window.__CODE_DOCTOR_MAP__=${data};${BUSINESS_MAP_UI_JS}</script>
+</body>
+</html>`;
 };
 
 export const renderAuditReport = (map: BusinessMap, report: BusinessAuditReport): string => {
