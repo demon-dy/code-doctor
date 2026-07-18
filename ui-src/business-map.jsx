@@ -312,6 +312,14 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       onPaneClick={() => setSelection(null)}
       minZoom={0.08}
       maxZoom={2}
+      panOnScroll
+      panOnScrollMode="free"
+      panOnScrollSpeed={0.72}
+      zoomOnScroll={false}
+      zoomOnPinch
+      zoomActivationKeyCode="Meta"
+      panOnDrag
+      preventScrolling
       nodesConnectable={false}
       nodesDraggable
       proOptions={{ hideAttribution: false }}
@@ -321,6 +329,7 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       <MiniMap pannable zoomable nodeColor={miniMapColor} maskColor="rgba(244, 242, 235, .78)" />
       <Legend />
       <Panel position="top-right" className="canvas-actions">
+        <span className="gesture-hint">双指平移 · 捏合缩放</span>
         <button disabled={!isLayouted} onClick={() => centerNode(baseNodes[0], 0.82)}>回到起点</button>
         <button disabled={!isLayouted} onClick={() => fitView({ padding: 0.16, duration: 480 })}>查看全景</button>
       </Panel>

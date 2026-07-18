@@ -133,6 +133,7 @@ button { color: inherit; }
 .focus-summary { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid #aaa69b; background: rgba(255, 253, 248, .96); color: #4d524d; font-size: 11px; box-shadow: 0 8px 20px rgba(40, 38, 32, .12); }
 .focus-summary button { padding: 4px 7px; border: 1px solid #8d918b; background: transparent; cursor: pointer; }
 .canvas-actions { display: flex; gap: 6px; padding: 4px; border: 1px solid var(--line); background: rgba(255, 253, 248, .95); box-shadow: 0 8px 20px rgba(40, 38, 32, .1); }
+.gesture-hint { align-self: center; padding: 0 7px; border-right: 1px solid var(--line); color: #77736b; font-size: 9px; white-space: nowrap; }
 .canvas-actions button { padding: 6px 9px; border: 0; background: transparent; color: #555b55; font-size: 10px; cursor: pointer; }
 .canvas-actions button:hover { background: #ece9e1; color: var(--ink); }
 .canvas-actions button:disabled { cursor: wait; opacity: .45; }
