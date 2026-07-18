@@ -4,6 +4,8 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 
 它是一个轻量 CLI：复用项目已有扫描器，每次只选择一个问题交给 Codex、Claude Code 或自定义 Agent 修复；验证通过后创建 GitLab MR，并生成可搜索的 TS/Go 静态调用图供人类审核和排障。
 
+本项目和 npm 包均为公司内部资产，只允许发布到 `g.ktvsky.com` 的私有 GitLab Package Registry，禁止发布到 npmjs 或其他外部仓库。发布前置脚本会强制检查 Registry 地址。
+
 ## 当前能力
 
 - 自动发现 React Doctor、ESLint、TypeScript、staticcheck、golangci-lint 或 go vet。

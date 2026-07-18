@@ -19,6 +19,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "prepare": "npm run build",
+    "prepublishOnly": "node scripts/assert-internal-registry.mjs",
     "release": "npm run check && npm publish",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
