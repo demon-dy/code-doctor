@@ -41,15 +41,16 @@ const statusMeta = {
   conflicted: { label: "证据冲突", short: "冲突" },
 };
 
-const nodeSize = (kind) => {
-  if (kind === "actor") return { width: 220, height: 92 };
-  if (kind === "decision") return { width: 250, height: 116 };
-  if (kind === "state") return { width: 242, height: 104 };
-  return { width: 250, height: 108 };
+const nodeSize = (node) => {
+  const width = node.kind === "actor" ? 230 : node.kind === "state" ? 248 : 258;
+  const summaryLines = Math.max(2, Math.min(5, Math.ceil(node.summary.length / 21)));
+  const titleLines = Math.max(1, Math.min(2, Math.ceil(node.label.length / 17)));
+  const height = 78 + summaryLines * 15 + (titleLines - 1) * 18;
+  return { width, height, summaryLines, titleLines };
 };
 
 const layoutGraph = async () => {
-  const children = map.nodes.map((node) => ({ id: node.id, ...nodeSize(node.kind) }));
+  const children = map.nodes.map((node) => ({ id: node.id, ...nodeSize(node) }));
   const graph = await elk.layout({
     id: "root",
     layoutOptions: {
@@ -67,12 +68,14 @@ const layoutGraph = async () => {
   const positions = new Map((graph.children ?? []).map((node) => [node.id, node]));
   return map.nodes.map((node) => {
     const position = positions.get(node.id) ?? { x: 0, y: 0 };
+    const size = nodeSize(node);
     return {
       id: node.id,
       type: node.kind,
       position: { x: position.x ?? 0, y: position.y ?? 0 },
-      data: { businessNode: node },
-      ...nodeSize(node.kind),
+      data: { businessNode: node, summaryLines: size.summaryLines, titleLines: size.titleLines },
+      width: size.width,
+      height: size.height,
     };
   });
 };
@@ -89,8 +92,8 @@ const BusinessNode = memo(({ data, selected }) => {
         <span className="kind-label">{kind.label}</span>
         <span className={`status-chip status-${node.status}`} title={status.label}>{status.short}</span>
       </div>
-      <div className="node-title">{node.label}</div>
-      <div className="node-summary">{node.summary}</div>
+      <div className="node-title" style={{ WebkitLineClamp: data.titleLines }} title={node.label}>{node.label}</div>
+      <div className="node-summary" style={{ WebkitLineClamp: data.summaryLines, height: `${data.summaryLines * 1.4}em` }} title={node.summary}>{node.summary}</div>
       <Handle className="business-handle source" type="source" position={Position.Right} />
     </div>
   );
@@ -220,15 +223,21 @@ function Legend() {
 
 function MapCanvas({ selection, setSelection, focusMode }) {
   const [baseNodes, setBaseNodes] = useState([]);
-  const { fitView } = useReactFlow();
+  const { fitView, getZoom, setCenter } = useReactFlow();
   const reachability = useMemo(() => collectFocusedSubgraph(map.edges, selection ?? undefined, focusMode), [selection, focusMode]);
+
+  const centerNode = (node, minimumZoom = 0.82) => {
+    if (!node) return;
+    const zoom = Math.max(getZoom(), minimumZoom);
+    setCenter(node.position.x + (node.width ?? 0) / 2, node.position.y + (node.height ?? 0) / 2, { zoom, duration: 420 });
+  };
 
   useEffect(() => {
     let mounted = true;
     layoutGraph().then((nodes) => {
       if (!mounted) return;
       setBaseNodes(nodes);
-      requestAnimationFrame(() => fitView({ padding: 0.18, duration: 500 }));
+      requestAnimationFrame(() => centerNode(nodes[0], 0.82));
     });
     return () => { mounted = false; };
   }, [fitView]);
@@ -263,9 +272,19 @@ function MapCanvas({ selection, setSelection, focusMode }) {
 
   useEffect(() => {
     if (!selection || !baseNodes.length) return;
-    const focused = nodes.filter((node) => !reachability || reachability.nodes.has(node.id));
-    if (focused.length) requestAnimationFrame(() => fitView({ nodes: focused, padding: 0.25, duration: 450, maxZoom: 1.25 }));
-  }, [selection, focusMode, baseNodes.length]);
+    if (selection.type === "node") {
+      requestAnimationFrame(() => centerNode(baseNodes.find((node) => node.id === selection.id)));
+      return;
+    }
+    const selectedEdge = map.edges.find((edge) => edge.id === selection.id);
+    const source = baseNodes.find((node) => node.id === selectedEdge?.from);
+    const target = baseNodes.find((node) => node.id === selectedEdge?.to);
+    if (source && target) {
+      const x = (source.position.x + (source.width ?? 0) / 2 + target.position.x + (target.width ?? 0) / 2) / 2;
+      const y = (source.position.y + (source.height ?? 0) / 2 + target.position.y + (target.height ?? 0) / 2) / 2;
+      requestAnimationFrame(() => setCenter(x, y, { zoom: Math.max(getZoom(), 0.72), duration: 420 }));
+    }
+  }, [selection?.type, selection?.id, baseNodes.length]);
 
   const miniMapColor = (node) => ({
     actor: "#7b6aa8", scenario: "#375f8b", action: "#31715f", decision: "#a16b2b",
@@ -285,13 +304,16 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       maxZoom={2}
       nodesConnectable={false}
       nodesDraggable
-      fitView
       proOptions={{ hideAttribution: false }}
     >
       <Background variant={BackgroundVariant.Dots} gap={22} size={1.1} color="#c8c5bc" />
       <Controls showInteractive={false} />
       <MiniMap pannable zoomable nodeColor={miniMapColor} maskColor="rgba(244, 242, 235, .78)" />
       <Legend />
+      <Panel position="top-right" className="canvas-actions">
+        <button onClick={() => centerNode(baseNodes[0], 0.82)}>回到起点</button>
+        <button onClick={() => fitView({ padding: 0.16, duration: 480 })}>查看全景</button>
+      </Panel>
       {selection && reachability && (
         <Panel position="bottom-center" className="focus-summary">
           已聚焦 {reachability.nodes.size} 个节点 / {reachability.edges.size} 条路径
