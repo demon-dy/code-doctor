@@ -4,7 +4,7 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 
 它是一个轻量 CLI：复用项目已有扫描器，每次只选择一个问题交给 Codex、Claude Code 或自定义 Agent 修复；验证通过后创建 GitLab MR，并生成可搜索的 TS/Go 静态调用图供人类审核和排障。
 
-本项目和 npm 包均为公司内部资产，只允许发布到 `g.ktvsky.com` 的私有 GitLab Package Registry，禁止发布到 npmjs 或其他外部仓库。发布前置脚本会强制检查 Registry 地址。
+本项目采用 MIT License，可供团队和社区自由使用。目前可以从 GitHub 安装；`@thunder/code-doctor` 的 npmjs 公共包将在取得 `@thunder` scope 发布权限后提供。
 
 ## 当前能力
 
@@ -20,11 +20,7 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 ## 快速开始
 
 ```bash
-npm config set @thunder:registry "https://g.ktvsky.com/api/v4/projects/2088/packages/npm/"
-npm config set -- "//g.ktvsky.com/api/v4/projects/2088/packages/npm/:_authToken" "$GITLAB_TOKEN"
-CODE_DOCTOR_TARBALL="$(npm pack --silent @thunder/code-doctor)"
-npm install --global "./$CODE_DOCTOR_TARBALL"
-rm -f "$CODE_DOCTOR_TARBALL"
+npm install --global "git+https://github.com/demon-dy/code-doctor.git"
 
 cd your-project
 code-doctor init
@@ -115,14 +111,12 @@ code-doctor ci install
 
 提交生成的 `.gitlab/code-doctor.yml` 后，在 GitLab 的 **CI/CD → Schedules** 中创建每日 Pipeline。CI 需要：
 
-- 能安装或运行 `@thunder/code-doctor`；
+- 能访问 GitHub 并安装 Code Doctor；
 - 可用的 `CODEX_API_KEY`、`ANTHROPIC_API_KEY` 或自定义 Agent 凭证；
 - 允许推送 `code-doctor/*` 分支并创建 MR 的 GitLab Token；
 - 目标项目依赖和测试环境。
 
-默认模板通过 `CI_JOB_TOKEN` 从 GitLab npm Package Registry 安装。如果目标项目没有跨项目读取权限，需要在 Code Doctor 项目的 Job Token allowlist 中加入目标项目，或改用具备 `read_package_registry` 权限的 Deploy Token。
-
-当前公司 GitLab 为 13.12，该版本的 npm Registry 元数据响应不包含 `bin` 字段；直接执行 `npm install --global @thunder/code-doctor` 不会创建命令链接。因此安装流程先用 `npm pack` 下载发布包，再从 tarball 安装。升级 GitLab 后可恢复为标准的一行安装命令。
+默认模板直接从公开 GitHub 仓库安装，不需要读取私有 npm Registry。
 
 系统不会自动合并 MR。
 
