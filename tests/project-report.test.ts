@@ -110,4 +110,46 @@ describe("project business report", () => {
     expect(result.report.coverage).toMatchObject({ discovered: 0, buildPending: 0, buildFailed: 0 });
     await expect(fs.access(result.htmlFile)).resolves.toBeUndefined();
   });
+
+  it("地图更新后不会把旧增量分析边界混入当前结论", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "code-doctor-project-stale-impact-"));
+    directories.push(root);
+    await fs.mkdir(path.join(root, "src"));
+    await fs.writeFile(path.join(root, "src", "login.ts"), "export const login = true;\n", "utf8");
+    await initializeKnowledge(root);
+    const knowledge = path.join(root, ".code-doctor", "knowledge");
+    await fs.writeFile(path.join(knowledge, "atlas.yaml"), YAML.stringify({
+      schemaVersion: 1,
+      scenarios: [{ id: "login-vip", title: "登录与会员", focus: "登录后刷新会员", evidenceFiles: ["src/login.ts"] }],
+    }), "utf8");
+    await fs.writeFile(path.join(knowledge, "scenarios", "login-vip.candidate.json"), JSON.stringify({
+      schemaVersion: 1,
+      updatedAt: "2026-07-19T02:00:00.000Z",
+      map: { ...map(root), createdAt: "2026-07-19T02:00:00.000Z" },
+    }), "utf8");
+    const output = path.join(root, ".code-doctor", "output");
+    await fs.mkdir(output, { recursive: true });
+    await fs.writeFile(path.join(output, "project-impact.json"), JSON.stringify({
+      schemaVersion: 1,
+      createdAt: "2026-07-19T01:00:00.000Z",
+      updatedAt: "2026-07-19T01:00:00.000Z",
+      root,
+      range: "HEAD~1...HEAD",
+      status: "completed",
+      useAgent: true,
+      changedFiles: [],
+      impactedScenarios: [],
+      unchangedScenarioIds: ["login-vip"],
+      unattributedFiles: [],
+      unknownBoundaries: ["1 个已发现业务场景尚未建图。"],
+      audit: { status: "completed" },
+    }), "utf8");
+
+    const result = await buildProjectReport(root);
+
+    expect(result.report.impact).toBeDefined();
+    expect(result.report.unknownBoundaries).not.toContain("1 个已发现业务场景尚未建图。");
+    expect(result.report.unknownBoundaries.join("\n")).toContain("旧分析边界未并入当前结论");
+    expect(await fs.readFile(result.htmlFile, "utf8")).toContain("历史 Git 变更影响（需更新）");
+  });
 });

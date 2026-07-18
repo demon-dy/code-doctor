@@ -6,8 +6,16 @@ const renderImpact = (report) => {
     const impact = report.impact;
     if (!impact)
         return "";
+    const impactUpdatedAt = Date.parse(impact.updatedAt);
+    const stale = Boolean((impact.sourceCommit && report.sourceCommit && impact.sourceCommit !== report.sourceCommit)
+        || (Number.isFinite(impactUpdatedAt) && report.scenarios.some((scenario) => {
+            if (!scenario.map)
+                return false;
+            const updatedAt = scenario.updatedAt ? Date.parse(scenario.updatedAt) : Number.NaN;
+            return Number.isFinite(updatedAt) && updatedAt > impactUpdatedAt;
+        })));
     const changed = impact.changedFiles.map((file) => `<li><code>${esc(file.previousPath ? `${file.previousPath} → ${file.path}` : file.path)}</code><span>${esc(file.status)} · ${file.scenarioIds.length ? `关联 ${file.scenarioIds.length} 个场景` : "未归属"}${file.global ? " · 全局" : ""}</span></li>`).join("");
-    return `<section class="panel impact-panel"><div class="section-head"><div><h2 class="section-title">最近 Git 变更影响</h2><p><code>${esc(impact.range)}</code> · ${esc(impact.status)} · 审计 ${esc(impact.audit.status)}</p></div></div><div class="impact-metrics"><span><strong>${impact.changedFiles.length}</strong> 变更文件</span><span><strong>${impact.impactedScenarios.length}</strong> 受影响场景</span><span><strong>${impact.unattributedFiles.length}</strong> 未归属文件</span><span><strong>${impact.unchangedScenarioIds.length}</strong> 无直接证据关联</span></div><details><summary>查看变更文件与归属</summary><ul class="impact-files">${changed || "<li>该范围没有文件变更。</li>"}</ul></details></section>`;
+    return `<section class="panel impact-panel"><div class="section-head"><div><h2 class="section-title">${stale ? "历史 Git 变更影响（需更新）" : "最近 Git 变更影响"}</h2><p><code>${esc(impact.range)}</code> · ${esc(impact.status)} · 审计 ${esc(impact.audit.status)}${stale ? " · 旧结果不代表当前地图" : ""}</p></div></div><div class="impact-metrics"><span><strong>${impact.changedFiles.length}</strong> 变更文件</span><span><strong>${impact.impactedScenarios.length}</strong> 受影响场景</span><span><strong>${impact.unattributedFiles.length}</strong> 未归属文件</span><span><strong>${impact.unchangedScenarioIds.length}</strong> 无直接证据关联</span></div><details><summary>查看变更文件与归属</summary><ul class="impact-files">${changed || "<li>该范围没有文件变更。</li>"}</ul></details></section>`;
 };
 export const renderProjectReport = (report) => `<!doctype html>
 <html lang="zh-CN">

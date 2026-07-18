@@ -286,11 +286,28 @@ export const buildProjectReport = async (root) => {
         && Array.isArray(impact.unknownBoundaries)
         && impact.audit) {
         report.impact = impact;
-        report.unknownBoundaries.push(...impact.unknownBoundaries);
-        if (impact.sourceCommit && head && impact.sourceCommit !== head)
-            report.unknownBoundaries.push("最近一次 Git 变更影响分析对应的源码提交已变化，需要重新运行 project update。");
-        if (impact.audit.status === "failed")
-            report.unknownBoundaries.push("最近一次增量更新后的项目审计失败，报告中的风险结论可能已过期。");
+        const impactSourceCurrent = !impact.sourceCommit || !head || impact.sourceCommit === head;
+        const impactUpdatedAt = typeof impact.updatedAt === "string" ? Date.parse(impact.updatedAt) : Number.NaN;
+        const mapsChangedAfterImpact = Number.isFinite(impactUpdatedAt) && scenarios.some((scenario) => {
+            if (!scenario.map)
+                return false;
+            const updatedAt = scenario.updatedAt ? Date.parse(scenario.updatedAt) : Number.NaN;
+            return Number.isFinite(updatedAt) && updatedAt > impactUpdatedAt;
+        });
+        // project-impact.json 是一次增量分析的时点快照。全量建图可能不改动 Git HEAD，
+        // 但会让其中“未建图场景”之类的旧边界失效。此时保留 impact 供历史查看，
+        // 不再把旧边界混入当前项目结论，避免出现“15/15 已建图”与“13 个未建图”同时成立。
+        if (impactSourceCurrent && !mapsChangedAfterImpact) {
+            report.unknownBoundaries.push(...impact.unknownBoundaries);
+            if (impact.audit.status === "failed")
+                report.unknownBoundaries.push("最近一次增量更新后的项目审计失败，报告中的风险结论可能已过期。");
+        }
+        else if (!impactSourceCurrent) {
+            report.unknownBoundaries.push("最近一次 Git 变更影响分析对应的源码提交已变化，需要重新运行 project update；旧分析边界未并入当前结论。");
+        }
+        else {
+            report.unknownBoundaries.push("最近一次 Git 变更影响分析早于业务地图更新，需要重新运行 project update；旧分析边界未并入当前结论。");
+        }
         report.unknownBoundaries = [...new Set(report.unknownBoundaries)];
     }
     const output = await ensureOutputDirectory(root);
