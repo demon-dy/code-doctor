@@ -42,7 +42,9 @@ const CI_JOB = `code-doctor-daily:
   variables:
     GIT_DEPTH: "0"
   before_script:
-    - npm install --global "git+https://gitlab-ci-token:\${CI_JOB_TOKEN}@g.ktvsky.com/ai-native/code-doctor.git#main"
+    - npm config set @thunder:registry "https://g.ktvsky.com/api/v4/projects/2088/packages/npm/"
+    - npm config set -- "//g.ktvsky.com/api/v4/projects/2088/packages/npm/:_authToken" "\${CI_JOB_TOKEN}"
+    - npm install --global @thunder/code-doctor
   script:
     - code-doctor run --one --open-mr
   artifacts:

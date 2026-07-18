@@ -18,7 +18,9 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 ## 快速开始
 
 ```bash
-npm install --global "git+ssh://git@g.ktvsky.com/ai-native/code-doctor.git"
+npm config set @thunder:registry "https://g.ktvsky.com/api/v4/projects/2088/packages/npm/"
+npm config set -- "//g.ktvsky.com/api/v4/projects/2088/packages/npm/:_authToken" "$GITLAB_TOKEN"
+npm install --global @thunder/code-doctor
 
 cd your-project
 code-doctor init
@@ -114,7 +116,7 @@ code-doctor ci install
 - 允许推送 `code-doctor/*` 分支并创建 MR 的 GitLab Token；
 - 目标项目依赖和测试环境。
 
-默认模板通过 `CI_JOB_TOKEN` 从 `ai-native/code-doctor` 安装。如果目标项目没有跨项目读取权限，需要在 Code Doctor 项目的 Job Token allowlist 中加入目标项目，或改用具备 `read_repository` 权限的 Deploy Token。
+默认模板通过 `CI_JOB_TOKEN` 从 GitLab npm Package Registry 安装。如果目标项目没有跨项目读取权限，需要在 Code Doctor 项目的 Job Token allowlist 中加入目标项目，或改用具备 `read_package_registry` 权限的 Deploy Token。
 
 系统不会自动合并 MR。
 

@@ -2,6 +2,13 @@
   "name": "@thunder/code-doctor",
   "version": "0.1.0",
   "description": "每天修复一个历史代码问题，并生成客户端到服务端的静态调用图",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@g.ktvsky.com/ai-native/code-doctor.git"
+  },
+  "publishConfig": {
+    "registry": "https://g.ktvsky.com/api/v4/projects/2088/packages/npm/"
+  },
   "type": "module",
   "bin": {
     "code-doctor": "dist/cli.js"
@@ -12,6 +19,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "prepare": "npm run build",
+    "release": "npm run check && npm publish",
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
