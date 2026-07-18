@@ -33,6 +33,11 @@ export interface GraphConfig {
     include: string[];
     exclude: string[];
 }
+export interface BusinessMapConfig {
+    enabled: boolean;
+    maxNodes: number;
+    maxEvidence: number;
+}
 export interface GitLabConfig {
     enabled: boolean;
     remote: string;
@@ -45,6 +50,7 @@ export interface CodeDoctorConfig {
     agent: AgentConfig;
     verify: string[];
     graph: GraphConfig;
+    businessMap: BusinessMapConfig;
     gitlab: GitLabConfig;
     limits: {
         maxChangedFiles: number;
@@ -91,6 +97,87 @@ export interface CodeGraph {
     nodes: GraphNode[];
     edges: GraphEdge[];
     stats: Record<string, number>;
+}
+export type BusinessNodeKind = "scenario" | "actor" | "state" | "decision" | "action" | "outcome" | "side_effect" | "system";
+export type KnowledgeStatus = "fact" | "inference" | "confirmed" | "unknown" | "conflicted";
+export type EvidenceKind = "source" | "test" | "git" | "runtime" | "human" | "agent";
+export interface BusinessEvidence {
+    id: string;
+    kind: EvidenceKind;
+    description: string;
+    location?: SourceLocation;
+    reference?: string;
+    confidence: number;
+}
+export interface BusinessNode {
+    id: string;
+    label: string;
+    kind: BusinessNodeKind;
+    summary: string;
+    status: KnowledgeStatus;
+    evidenceIds: string[];
+}
+export interface BusinessEdge {
+    id: string;
+    from: string;
+    to: string;
+    label?: string;
+    guard?: string;
+    status: KnowledgeStatus;
+    confidence: number;
+    evidenceIds: string[];
+}
+export interface BusinessMap {
+    schemaVersion: 1;
+    createdAt: string;
+    root: string;
+    title: string;
+    focus: string;
+    summary: string;
+    nodes: BusinessNode[];
+    edges: BusinessEdge[];
+    evidence: BusinessEvidence[];
+    uncertainties: string[];
+    agent?: {
+        provider: string;
+        durationMs: number;
+    };
+}
+export interface BusinessExpectation {
+    raw: string;
+    interpretation: string;
+    actors: string[];
+    preconditions: string[];
+    expectedOutcomes: string[];
+    assumptions: string[];
+}
+export type FindingStatus = "satisfied" | "violated" | "uncertain";
+export interface BusinessFinding {
+    id: string;
+    status: FindingStatus;
+    severity: Severity;
+    title: string;
+    conclusion: string;
+    reasoning: string[];
+    relatedNodeIds: string[];
+    evidenceIds: string[];
+    confidence: number;
+    recommendation?: string;
+}
+export interface BusinessAuditReport {
+    schemaVersion: 1;
+    runId: string;
+    createdAt: string;
+    root: string;
+    mapCreatedAt: string;
+    expectation: BusinessExpectation;
+    conclusion: string;
+    findings: BusinessFinding[];
+    unansweredQuestions: string[];
+    agent?: {
+        provider: string;
+        durationMs: number;
+    };
 }
 export interface AgentRunResult {
     provider: string;

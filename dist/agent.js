@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { runCommand } from "./process.js";
 import { commandExists, ensureOutputDirectory, writeJson } from "./utils.js";
-const resolveProvider = async (requested) => {
+export const resolveProvider = async (requested) => {
     if (requested !== "auto")
         return requested;
     if (await commandExists("codex"))
@@ -52,7 +52,7 @@ export const createRepairTask = async (input) => {
     await fs.writeFile(promptFile, `${buildPrompt(taskFile)}\n`, "utf8");
     return { task, taskFile, promptFile };
 };
-export const runRepairAgent = async (input) => {
+export const runConfiguredAgent = async (input) => {
     const provider = await resolveProvider(input.config.provider);
     let command;
     if (provider === "codex") {
@@ -78,8 +78,9 @@ export const runRepairAgent = async (input) => {
         },
     });
     const output = await ensureOutputDirectory(input.root);
-    await fs.writeFile(path.join(output, "agent-stdout.jsonl"), result.stdout, "utf8");
-    await fs.writeFile(path.join(output, "agent-stderr.log"), result.stderr, "utf8");
+    const prefix = input.artifactPrefix ? `${input.artifactPrefix}-` : "";
+    await fs.writeFile(path.join(output, `${prefix}agent-stdout.jsonl`), result.stdout, "utf8");
+    await fs.writeFile(path.join(output, `${prefix}agent-stderr.log`), result.stderr, "utf8");
     return {
         provider,
         command,
@@ -89,4 +90,5 @@ export const runRepairAgent = async (input) => {
         stderr: result.stderr,
     };
 };
+export const runRepairAgent = async (input) => runConfiguredAgent(input);
 //# sourceMappingURL=agent.js.map

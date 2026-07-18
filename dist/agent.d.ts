@@ -10,6 +10,7 @@ export interface RepairTask {
     };
     verificationCommands: string[];
 }
+export declare const resolveProvider: (requested: AgentConfig["provider"]) => Promise<Exclude<AgentConfig["provider"], "auto">>;
 export declare const createRepairTask: (input: {
     root: string;
     diagnostic: Diagnostic;
@@ -21,6 +22,12 @@ export declare const createRepairTask: (input: {
     taskFile: string;
     promptFile: string;
 }>;
+export declare const runConfiguredAgent: (input: {
+    root: string;
+    config: AgentConfig;
+    promptFile: string;
+    artifactPrefix?: string;
+}) => Promise<AgentRunResult>;
 export declare const runRepairAgent: (input: {
     root: string;
     config: AgentConfig;

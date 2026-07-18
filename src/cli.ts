@@ -3,6 +3,10 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { Command } from "commander";
 import pc from "picocolors";
+import fs from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { buildBusinessMap } from "./business-map/build.js";
+import { checkBusinessRequirement } from "./business-map/check.js";
 import { loadConfig } from "./config.js";
 import { fixOneIssue } from "./fix.js";
 import { analyzeCodeGraph } from "./graph/analyze.js";
@@ -15,6 +19,18 @@ const rootOption = (command: Command): Command =>
 
 const resolveRoot = (value: string): string => path.resolve(value);
 const packageVersion = (createRequire(import.meta.url)("../package.json") as { version: string }).version;
+
+const configureAgent = (config: Awaited<ReturnType<typeof loadConfig>>, provider?: string): void => {
+  if (provider) config.agent.provider = provider as typeof config.agent.provider;
+};
+
+const openLocalFile = async (file: string): Promise<void> => {
+  await fs.access(file);
+  const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+  const args = process.platform === "win32" ? ["/c", "start", "", file] : [file];
+  const child = spawn(command, args, { detached: true, stdio: "ignore" });
+  child.unref();
+};
 
 const program = new Command()
   .name("code-doctor")
@@ -59,6 +75,59 @@ rootOption(program.command("graph").description("生成 JS/TS/Vue/Go 静态调�
     console.log(pc.dim(`${graph.stats.nodes} 个节点，${graph.stats.edges} 条边，${graph.stats.endpoints} 个接口`));
   });
 
+const map = program.command("map").description("AI 业务地图：理解、展示并审计代码实际表达的业务行为");
+
+rootOption(map.command("build").description("让 Agent 从代码和技术图生成可追溯业务地图"))
+  .requiredOption("--focus <business-scenario>", "本次要理解的业务场景、页面、入口或问题")
+  .option("--agent <provider>", "auto、codex、claude 或 custom")
+  .action(async (options: { root: string; focus: string; agent?: string }) => {
+    const root = resolveRoot(options.root);
+    const config = await loadConfig(root);
+    configureAgent(config, options.agent);
+    const result = await buildBusinessMap({ root, config, focus: options.focus });
+    console.log(pc.green(`AI 业务地图已生成：${result.htmlFile}`));
+    console.log(pc.dim(`${result.map.nodes.length} 个业务节点，${result.map.edges.length} 条路径，${result.map.evidence.length} 条证据`));
+    if (result.map.uncertainties.length) console.log(pc.yellow(`仍有 ${result.map.uncertainties.length} 个不确定项，请人工校准`));
+  });
+
+rootOption(map.command("check").description("用自然语言需求检查业务地图并生成证据化结论"))
+  .argument("<requirement>", "要检查的业务需求")
+  .option("--agent <provider>", "auto、codex、claude 或 custom")
+  .action(async (requirement: string, options: { root: string; agent?: string }) => {
+    const root = resolveRoot(options.root);
+    const config = await loadConfig(root);
+    configureAgent(config, options.agent);
+    const result = await checkBusinessRequirement({ root, config, requirement });
+    console.log(pc.bold(result.report.conclusion));
+    for (const finding of result.report.findings) {
+      const marker = finding.status === "violated" ? pc.red("●") : finding.status === "satisfied" ? pc.green("●") : pc.yellow("●");
+      console.log(`${marker} ${finding.title} ${pc.dim(`${Math.round(finding.confidence * 100)}%`)}`);
+      console.log(`  ${finding.conclusion}`);
+    }
+    console.log(pc.dim(`完整审计报告：${result.htmlFile}`));
+  });
+
+rootOption(map.command("ask").description("check 的对话式别名：向当前业务地图提出问题"))
+  .argument("<question>", "关于业务行为的问题或期望")
+  .option("--agent <provider>", "auto、codex、claude 或 custom")
+  .action(async (question: string, options: { root: string; agent?: string }) => {
+    const root = resolveRoot(options.root);
+    const config = await loadConfig(root);
+    configureAgent(config, options.agent);
+    const result = await checkBusinessRequirement({ root, config, requirement: question });
+    console.log(result.report.conclusion);
+    console.log(pc.dim(`证据化回答：${result.htmlFile}`));
+  });
+
+rootOption(map.command("open").description("打开最近生成的 AI 业务地图或审计报告"))
+  .option("--report", "打开审计报告而不是业务地图", false)
+  .action(async (options: { root: string; report: boolean }) => {
+    const root = resolveRoot(options.root);
+    const file = path.join(root, ".code-doctor", "output", options.report ? "audit-report.html" : "business-map.html");
+    await openLocalFile(file);
+    console.log(file);
+  });
+
 const addFixOptions = (command: Command): Command =>
   rootOption(command)
     .option("--one", "每次只修复一个问题", true)
@@ -69,7 +138,7 @@ addFixOptions(program.command("fix").description("选择一个历史问题并交
   .action(async (options: { root: string; agent?: string; openMr: boolean }) => {
     const root = resolveRoot(options.root);
     const config = await loadConfig(root);
-    if (options.agent) config.agent.provider = options.agent as typeof config.agent.provider;
+    configureAgent(config, options.agent);
     const record = await fixOneIssue({ root, config, openMergeRequest: options.openMr });
     if (record.error) {
       console.error(pc.red(`修复失败：${record.error}`));
@@ -88,7 +157,7 @@ addFixOptions(program.command("run").description("扫描、画图、修复一个
   .action(async (options: { root: string; agent?: string; openMr: boolean }) => {
     const root = resolveRoot(options.root);
     const config = await loadConfig(root);
-    if (options.agent) config.agent.provider = options.agent as typeof config.agent.provider;
+    configureAgent(config, options.agent);
     if (config.graph.enabled) {
       const graph = await analyzeCodeGraph({ root, config });
       await writeGraphArtifacts(root, graph);

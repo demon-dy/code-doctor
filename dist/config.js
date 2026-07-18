@@ -8,6 +8,7 @@ const mergeConfig = (input) => ({
     ...input,
     agent: { ...DEFAULT_CONFIG.agent, ...input.agent },
     graph: { ...DEFAULT_CONFIG.graph, ...input.graph },
+    businessMap: { ...DEFAULT_CONFIG.businessMap, ...input.businessMap },
     gitlab: { ...DEFAULT_CONFIG.gitlab, ...input.gitlab },
     limits: { ...DEFAULT_CONFIG.limits, ...input.limits },
     scanners: input.scanners ?? DEFAULT_CONFIG.scanners,

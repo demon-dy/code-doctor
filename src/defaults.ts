@@ -39,6 +39,11 @@ export const DEFAULT_CONFIG: CodeDoctorConfig = {
       "**/.git/**",
     ],
   },
+  businessMap: {
+    enabled: true,
+    maxNodes: 80,
+    maxEvidence: 200,
+  },
   gitlab: {
     enabled: true,
     remote: "origin",

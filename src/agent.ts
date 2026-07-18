@@ -16,7 +16,7 @@ export interface RepairTask {
   verificationCommands: string[];
 }
 
-const resolveProvider = async (
+export const resolveProvider = async (
   requested: AgentConfig["provider"],
 ): Promise<Exclude<AgentConfig["provider"], "auto">> => {
   if (requested !== "auto") return requested;
@@ -75,10 +75,11 @@ export const createRepairTask = async (input: {
   return { task, taskFile, promptFile };
 };
 
-export const runRepairAgent = async (input: {
+export const runConfiguredAgent = async (input: {
   root: string;
   config: AgentConfig;
   promptFile: string;
+  artifactPrefix?: string;
 }): Promise<AgentRunResult> => {
   const provider = await resolveProvider(input.config.provider);
   let command: string;
@@ -102,8 +103,9 @@ export const runRepairAgent = async (input: {
     },
   });
   const output = await ensureOutputDirectory(input.root);
-  await fs.writeFile(path.join(output, "agent-stdout.jsonl"), result.stdout, "utf8");
-  await fs.writeFile(path.join(output, "agent-stderr.log"), result.stderr, "utf8");
+  const prefix = input.artifactPrefix ? `${input.artifactPrefix}-` : "";
+  await fs.writeFile(path.join(output, `${prefix}agent-stdout.jsonl`), result.stdout, "utf8");
+  await fs.writeFile(path.join(output, `${prefix}agent-stderr.log`), result.stderr, "utf8");
   return {
     provider,
     command,
@@ -113,3 +115,9 @@ export const runRepairAgent = async (input: {
     stderr: result.stderr,
   };
 };
+
+export const runRepairAgent = async (input: {
+  root: string;
+  config: AgentConfig;
+  promptFile: string;
+}): Promise<AgentRunResult> => runConfiguredAgent(input);

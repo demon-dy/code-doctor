@@ -1,12 +1,25 @@
 # Code Doctor
 
-Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大，以及客户端到服务端调用链难以理解的问题。
+Code Doctor 是一个 AI 业务代码审计系统，解决 AI 生成代码后人类难以理解真实业务行为、历史逻辑缺陷持续堆积，以及客户端到服务端链路难以追溯的问题。
 
-它是一个轻量 CLI：复用项目已有扫描器，每次只选择一个问题交给 Codex、Claude Code 或自定义 Agent 修复；验证通过后创建 GitLab MR，并生成可搜索的 JS/TS/Vue/Go 静态调用图供人类审核和排障。
+它以 AI 作为业务理解和审计引擎，以源码、调用图、测试和 Git 作为证据工具：AI 将复杂实现压缩成可视化业务地图，人类可以用自然语言需求检查实际行为，再把结论追溯到具体源码。传统扫描和“每天修一个问题”仍然保留，但不再是产品核心。
 
 本项目采用 MIT License，可供团队和社区自由使用，并以 `@thunder-doctor/code-doctor` 发布到 npmjs。
 
 ## 当前能力
+
+### AI 业务审计
+
+- Codex、Claude Code 或任意自定义 Agent 从项目代码生成精简业务地图。
+- 地图表达角色、场景、状态、判断、动作、结果、系统和外部副作用。
+- 每个业务节点和路径带有源码证据、知识状态和置信度。
+- 区分代码事实、AI 推断、人工确认、未知和证据冲突，不把模型猜测伪装成事实。
+- 使用自然语言需求检查业务地图，输出满足、违反或证据不足的结论。
+- 生成可交互的业务地图和审计报告，支持从业务结果下钻到源码。
+- Agent 只负责理解和调查；Code Doctor 校验文件、行号、节点引用和证据引用。
+- 建图和审计期间禁止 Agent 修改项目源码或 Git 状态。
+
+### 技术扫描与修复
 
 - 自动发现 React Doctor、ESLint、TypeScript、staticcheck、golangci-lint 或 go vet。
 - 统一解析 React Doctor、ESLint、TypeScript、Go、SARIF 和通用 JSON 诊断。
@@ -27,8 +40,53 @@ cd your-project
 code-doctor init
 code-doctor scan
 code-doctor graph
+code-doctor map build --focus "首页会员弹窗"
+code-doctor map open
+code-doctor map check "会员到期用户必须看到续费弹窗"
+code-doctor map open --report
 code-doctor run --one --open-mr
 ```
+
+## AI 业务地图
+
+先明确一个业务场景、页面、入口或问题，让 Agent 聚焦理解，而不是一次吞下整个历史系统：
+
+```bash
+code-doctor map build --focus "首页开屏弹窗的选择、优先级与展示条件"
+```
+
+生成：
+
+```text
+.code-doctor/output/
+├── graph.json                 # 底层技术证据图
+├── business-map.json          # 结构化业务地图
+├── business-map.html          # 人类可读的分层地图
+├── map-run.json               # Agent 和本次建图审计记录
+├── map-agent-stdout.jsonl
+└── map-agent-stderr.log
+```
+
+然后使用人类需求检查实际实现：
+
+```bash
+code-doctor map check "新用户、普通用户和会员到期用户应该分别展示对应弹窗"
+```
+
+Code Doctor 会要求 Agent 先解释需求，再主动寻找支持证据和反证，最终输出：
+
+```text
+.code-doctor/output/audit-report.json
+.code-doctor/output/audit-report.html
+```
+
+`map ask` 是同一套证据化审计能力的对话式别名：
+
+```bash
+code-doctor map ask "续费弹窗是否存在永远无法到达的路径？"
+```
+
+业务地图不是静态分析工具自动画出的函数图。技术调用图只提供线索，最终业务节点、条件和结果由 Agent 结合源码上下文理解；Code Doctor 再对它引用的证据做确定性校验。证据不足时，正确结果是 `uncertain`，而不是猜测。
 
 开发阶段也可以直接从本仓库运行：
 
@@ -61,6 +119,10 @@ graph:
     - "**/*.jsx"
     - "**/*.vue"
     - "**/*.go"
+businessMap:
+  enabled: true
+  maxNodes: 80
+  maxEvidence: 200
 gitlab:
   enabled: true
   remote: origin
