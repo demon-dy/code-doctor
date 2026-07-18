@@ -20,7 +20,7 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 ## 快速开始
 
 ```bash
-npm install --global "git+https://github.com/demon-dy/code-doctor.git"
+npm install --global "https://github.com/demon-dy/code-doctor/archive/refs/tags/v0.1.2.tar.gz"
 
 cd your-project
 code-doctor init
@@ -116,7 +116,7 @@ code-doctor ci install
 - 允许推送 `code-doctor/*` 分支并创建 MR 的 GitLab Token；
 - 目标项目依赖和测试环境。
 
-默认模板直接从公开 GitHub 仓库安装，不需要读取私有 npm Registry。
+默认模板从公开 GitHub Release tarball 安装，不需要读取私有 npm Registry。
 
 系统不会自动合并 MR。
 

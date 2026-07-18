@@ -1,6 +1,6 @@
 {
   "name": "@thunder/code-doctor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "每天修复一个历史代码问题，并生成客户端到服务端的静态调用图",
   "repository": {
     "type": "git",
