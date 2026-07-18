@@ -4,7 +4,9 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import {
   Background,
   BackgroundVariant,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MarkerType,
   MiniMap,
@@ -13,6 +15,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   applyNodeChanges,
+  getSmoothStepPath,
   useNodesInitialized,
   useReactFlow,
 } from "@xyflow/react";
@@ -101,6 +104,31 @@ const BusinessNode = memo(({ data, selected }) => {
 
 const nodeTypes = Object.fromEntries(Object.keys(kindMeta).map((kind) => [kind, BusinessNode]));
 
+const BusinessPathEdge = memo(({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, data, selected }) => {
+  const [edgePath, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 6, offset: 24 });
+  const edge = data.businessEdge;
+  const label = edge.guard || edge.label;
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} interactionWidth={24} />
+      {label && (
+        <EdgeLabelRenderer>
+          <button
+            type="button"
+            className={`edge-label nodrag nopan status-${edge.status} ${selected ? "is-selected" : ""}`}
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+            onClick={(event) => { event.stopPropagation(); data.onSelect(id); }}
+          >
+            {label}
+          </button>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+});
+
+const edgeTypes = { business: BusinessPathEdge };
+
 const evidenceById = new Map(map.evidence.map((item) => [item.id, item]));
 const nodeById = new Map(map.nodes.map((item) => [item.id, item]));
 
@@ -143,8 +171,8 @@ function DetailPanel({ selection, onSelectNode }) {
         <EvidenceList ids={edge.evidenceIds} />
         <section className="detail-section">
           <h3>路径端点</h3>
-          <button className="path-button" onClick={() => onSelectNode(edge.from)}>起点 · {from?.label}</button>
-          <button className="path-button" onClick={() => onSelectNode(edge.to)}>终点 · {to?.label}</button>
+          <button className="path-button" onClick={() => onSelectNode(edge.from)}><span>起</span><span>{from?.label}</span><small>路径起点</small></button>
+          <button className="path-button" onClick={() => onSelectNode(edge.to)}><span>终</span><span>{to?.label}</span><small>路径终点</small></button>
         </section>
       </aside>
     );
@@ -261,17 +289,11 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       id: edge.id,
       source: edge.from,
       target: edge.to,
-      type: "smoothstep",
-      label: edge.guard || edge.label,
-      data: { businessEdge: edge },
+      type: "business",
+      data: { businessEdge: edge, onSelect: (id) => setSelection({ type: "edge", id }) },
       markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color: edgeColor },
       className: `evidence-${edge.status} ${!isLayouted ? "is-preparing" : active ? "is-emphasized" : "is-dimmed"}`,
       selected: selection?.type === "edge" && selection.id === edge.id,
-      labelShowBg: true,
-      labelBgPadding: [6, 4],
-      labelBgBorderRadius: 3,
-      labelStyle: { fontSize: 11, fontWeight: 650 },
-      labelBgStyle: { fill: "#fffdf8", fillOpacity: 0.96 },
       selectable: true,
     };
   }), [reachability, selection, isLayouted]);
@@ -306,6 +328,7 @@ function MapCanvas({ selection, setSelection, focusMode }) {
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodesChange={(changes) => setBaseNodes((current) => applyNodeChanges(changes, current))}
       onNodeClick={(_, node) => setSelection({ type: "node", id: node.id })}
       onEdgeClick={(_, edge) => setSelection({ type: "edge", id: edge.id })}

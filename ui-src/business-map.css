@@ -78,7 +78,11 @@ button { color: inherit; }
 .react-flow__edge.evidence-unknown .react-flow__edge-path { stroke: var(--unknown); stroke-dasharray: 2 5; }
 .react-flow__edge.evidence-conflicted .react-flow__edge-path { stroke: var(--conflicted); stroke-width: 3; stroke-dasharray: 12 4 2 4; }
 .react-flow__edge.selected .react-flow__edge-path { stroke-width: 4; }
-.react-flow__edge-text { fill: #444a45; }
+.edge-label { position: absolute; z-index: 6; width: max-content; max-width: 230px; padding: 5px 8px; border: 1px solid #c9c5ba; border-radius: 3px; background: rgba(255, 253, 248, .98); color: #444a45; font-size: 10px; font-weight: 680; line-height: 1.45; text-align: left; white-space: normal; overflow-wrap: anywhere; box-shadow: 0 2px 6px rgba(48, 45, 38, .08); cursor: pointer; transform-origin: center; }
+.edge-label:hover, .edge-label.is-selected { z-index: 8; border-color: currentColor; box-shadow: 0 4px 12px rgba(48, 45, 38, .16); }
+.edge-label.status-inference { border-style: dashed; }
+.edge-label.status-unknown { border-style: dotted; }
+.edge-label.status-conflicted { border-width: 2px; }
 .react-flow__controls { overflow: hidden; border: 1px solid var(--line); border-radius: 0; box-shadow: none; }
 .react-flow__controls-button { border-bottom-color: var(--line); background: var(--panel); }
 .react-flow__minimap { border: 1px solid var(--line); border-radius: 0; background: #e9e6de; box-shadow: none; }
