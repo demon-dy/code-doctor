@@ -44,6 +44,8 @@ code-doctor scan
 code-doctor graph
 code-doctor map build --focus "首页会员弹窗" --id home-popup
 code-doctor map confirm home-popup --by "业务Owner"
+code-doctor project build
+code-doctor project open
 code-doctor map open
 code-doctor map check "会员到期用户必须看到续费弹窗"
 code-doctor map open --report
@@ -119,6 +121,31 @@ code-doctor takeover progress
 ```
 
 “Owner 已理解”与“业务地图已人工确认”分别记录，避免将学习进度误当成业务真相。
+
+## 项目业务审计总览
+
+`map discover` 和逐场景 `map build` 的长期知识可以聚合成一个项目级入口：
+
+```bash
+code-doctor project build
+code-doctor project open
+```
+
+生成 `.code-doctor/output/project-report.json` 和自包含的
+`.code-doctor/output/project-report.html`。HTML 不需要部署服务或访问 CDN，交给其他人即可离线打开。
+
+项目总览展示：
+
+- 全项目候选业务目录、优先级和场景依赖；
+- 待建图、候选地图、已确认、有待审更新四种知识状态；
+- 场景地图证据代码变化后的待审状态；
+- 业务建图覆盖率、人工确认覆盖率和证据文件可用率；
+- 未建图场景、缺失证据、AI 不确定项和证据冲突等审计边界；
+- 从项目全景下钻到单场景的章节、节点、路径条件和源码证据。
+
+这份报告明确表达“当前发现并获得证据的业务”，不会把未建图范围隐藏起来，也不会把
+“已扫描代码”错误表述成“已证明不存在业务漏洞”。旧版直接保存 BusinessMap 的
+`scenarios/*.json` 知识目录仍可读取。
 
 ## AI 业务地图
 
@@ -329,6 +356,8 @@ graph.json
 graph.html
 business-map.json
 business-map.html
+project-report.json
+project-report.html
 audit-index.json
 audit-report.<scenario-id>.json
 audit-report.<scenario-id>.html

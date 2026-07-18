@@ -221,6 +221,49 @@ export interface KnowledgeAtlas {
     updatedAt: string;
     scenarios: KnowledgeAtlasEntry[];
 }
+export type ProjectScenarioState = "unmapped" | "mapped" | "reviewed" | "pending_review";
+export type ProjectScenarioFreshness = "current" | "stale" | "unknown";
+export interface ProjectReportScenario {
+    id: string;
+    title: string;
+    focus: string;
+    summary?: string;
+    priority: "critical" | "high" | "normal";
+    dependsOn: string[];
+    evidenceFiles: string[];
+    missingEvidenceFiles: string[];
+    state: ProjectScenarioState;
+    freshness: ProjectScenarioFreshness;
+    updatedAt: string;
+    sourceCommit?: string;
+    changedEvidenceFiles: string[];
+    map?: BusinessMap;
+}
+export interface ProjectBusinessReport {
+    schemaVersion: 1;
+    createdAt: string;
+    root: string;
+    project: {
+        name: string;
+        summary: string;
+        summaryStatus: "empty" | "candidate" | "confirmed";
+    };
+    atlasUpdatedAt?: string;
+    sourceCommit?: string;
+    scenarios: ProjectReportScenario[];
+    coverage: {
+        discovered: number;
+        mapped: number;
+        reviewed: number;
+        pendingReview: number;
+        stale: number;
+        evidenceFiles: number;
+        existingEvidenceFiles: number;
+        mapPercent: number;
+        reviewPercent: number;
+    };
+    unknownBoundaries: string[];
+}
 export interface KnowledgeRule {
     id: string;
     scenarioId: string;

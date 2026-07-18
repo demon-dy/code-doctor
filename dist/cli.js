@@ -16,6 +16,7 @@ import { writeGraphArtifacts } from "./graph/render.js";
 import { initializeProject, installGitLabCi } from "./init.js";
 import { confirmScenario, addConfirmedRule, confirmTakeoverScenario, listScenarios, listRules, loadScenario, nextTakeoverScenario, startTakeover, takeoverProgress, } from "./knowledge.js";
 import { scanFailureMessages, scanProject } from "./scan.js";
+import { buildProjectReport } from "./project-report/build.js";
 const rootOption = (command) => command.option("-C, --root <directory>", "项目根目录", process.cwd());
 const resolveRoot = (value) => path.resolve(value);
 const packageVersion = createRequire(import.meta.url)("../package.json").version;
@@ -158,6 +159,22 @@ rootOption(map.command("open").description("打开最近生成的 AI 业务地�
     .action(async (options) => {
     const root = resolveRoot(options.root);
     const file = path.join(root, ".code-doctor", "output", options.report ? "audit-report.html" : "business-map.html");
+    await openLocalFile(file);
+    console.log(file);
+});
+const project = program.command("project").description("聚合整个项目的业务场景、覆盖状态、未知边界和下钻地图");
+rootOption(project.command("build").description("从项目知识目录生成自包含项目业务审计总览"))
+    .action(async (options) => {
+    const root = resolveRoot(options.root);
+    const result = await buildProjectReport(root);
+    console.log(pc.green(`项目业务审计总览已生成：${result.htmlFile}`));
+    console.log(pc.dim(`${result.report.coverage.discovered} 个候选场景，${result.report.coverage.mapped} 个已建图，${result.report.coverage.reviewed} 个已确认`));
+    if (result.report.unknownBoundaries.length)
+        console.log(pc.yellow(`${result.report.unknownBoundaries.length} 个未知或审计边界需要关注`));
+});
+rootOption(project.command("open").description("打开最近生成的项目业务审计总览"))
+    .action(async (options) => {
+    const file = path.join(resolveRoot(options.root), ".code-doctor", "output", "project-report.html");
     await openLocalFile(file);
     console.log(file);
 });
