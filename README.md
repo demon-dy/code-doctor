@@ -31,27 +31,69 @@ Code Doctor 是一个 AI 业务代码审计系统，解决 AI 生成代码后人
 - 输出 `graph.json` 和单文件 `graph.html`，不需要部署后台。
 - 保存扫描、Agent 输出、测试、调用图和运行结论作为 CI Artifact。
 
-## 快速开始
+## 3 分钟开始
 
 ```bash
 npm install --global @thunder-doctor/code-doctor
 
 cd your-project
-code-doctor init
-code-doctor map discover
-code-doctor takeover start --owner "新Owner"
-code-doctor scan
-code-doctor graph
-code-doctor map build --focus "首页会员弹窗" --id home-popup
-code-doctor map confirm home-popup --by "业务Owner"
-code-doctor project build --all
-code-doctor project build
+# 先看环境、Agent 与当前覆盖；--json 可供 CI/脚本读取
+code-doctor project doctor
+
+# 一次完成初始化、业务发现、1 个场景建图、全项目审计和唯一 HTML
+code-doctor project start
 code-doctor project open
-code-doctor map open
-code-doctor map check "会员到期用户必须看到续费弹窗"
-code-doctor map open --report
-code-doctor run --one --open-mr
 ```
+
+默认每次最多调用 Agent 建图 1 个场景，避免第一次运行意外消耗过多时间和额度；重复执行
+`project start` 会从 `.code-doctor/output/project-build-run.json` 恢复并继续，不覆盖已经沉淀的
+知识。想一次多处理几个场景可用 `--limit 3`，暂不做全局 AI 风险审计可用 `--no-audit`，
+完成后直接打开可用 `--open`。
+
+最终给人阅读的入口始终是
+`.code-doctor/output/project-report.html`。它是一个无 CDN、无需服务端的自包含 HTML，
+聚合业务目录、逐场景地图、源码证据、覆盖率、未知边界、断链与 AI 业务逻辑风险。
+`.code-doctor/knowledge/` 是应随 Git 提交的长期业务知识；`.code-doctor/output/` 是可随时
+重建或作为 CI Artifact 保存的运行产物。
+
+### Agent 不锁定
+
+默认 `agent.provider: auto` 会依次寻找本机已登录的 Codex 和 Claude Code，也可以临时指定：
+
+```bash
+code-doctor project start --agent codex
+code-doctor project start --agent claude
+```
+
+任何能读取任务文件并按其中 `candidateFile` / `outputContract` 写入 JSON 的 Agent 都可接入：
+
+```yaml
+# code-doctor.yaml
+agent:
+  provider: custom
+  command: my-agent --prompt {promptFile} --root {root}
+  timeoutMs: 900000
+```
+
+运行时同时提供 `CODE_DOCTOR_PROMPT_FILE` 和 `CODE_DOCTOR_ROOT` 环境变量。`project doctor`
+会检查自定义命令入口；没有 Git 时仍可生成地图，但新鲜度和增量影响会标为未知；没有 Agent
+或项目为空时仍会生成技术图与覆盖边界 HTML，并明确说明没有完成 AI 业务理解。
+
+### 日常与 CI
+
+首次可反复运行 `project start` 补齐覆盖；日常提交使用
+`code-doctor project update --changed origin/main...HEAD`，定时任务使用
+`code-doctor project build --all --limit 1` 和 `code-doctor project audit`。GitLab 可一键安装：
+
+```bash
+code-doctor ci install --mode all
+```
+
+CI 需要为所选 Agent 准备登录态或凭证；没有 Agent 的离线门禁可使用
+`code-doctor project audit --no-agent`，它只做确定性结构审计，并会在报告里保留 AI 未审计边界。
+
+以下命令仍可按需单独使用：`init`、`graph`、`map discover`、`map build`、`map check`、
+`project build --all`、`project audit`、`scan` 和 `run --one --open-mr`。
 
 ## 项目长期知识
 

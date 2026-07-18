@@ -23,7 +23,8 @@
     "dev": "tsx src/cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test && npm run build"
+    "test:pack": "node scripts/test-packed-cli.mjs",
+    "check": "npm run typecheck && npm test && npm run build && npm run test:pack"
   },
   "engines": {
     "node": ">=20"

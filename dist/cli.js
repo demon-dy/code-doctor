@@ -20,6 +20,8 @@ import { buildProjectReport } from "./project-report/build.js";
 import { runAllProjectScenarios } from "./project-report/run-all.js";
 import { auditProjectBusiness } from "./project-audit/audit.js";
 import { rangeFromBase, updateProjectFromGit } from "./project-report/update.js";
+import { inspectProject } from "./project-report/doctor.js";
+import { startProject } from "./project-report/start.js";
 const rootOption = (command) => command.option("-C, --root <directory>", "项目根目录", process.cwd());
 const resolveRoot = (value) => path.resolve(value);
 const packageVersion = createRequire(import.meta.url)("../package.json").version;
@@ -166,6 +168,43 @@ rootOption(map.command("open").description("打开最近生成的 AI 业务地�
     console.log(file);
 });
 const project = program.command("project").description("聚合整个项目的业务场景、覆盖状态、未知边界和下钻地图");
+rootOption(project.command("doctor").description("自检 Node、Git、配置、Agent、语言和业务知识覆盖"))
+    .option("--json", "只输出机器可读 JSON")
+    .action(async (options) => {
+    const report = await inspectProject(resolveRoot(options.root));
+    if (options.json)
+        console.log(JSON.stringify(report));
+    else {
+        console.log(pc.bold(report.ready ? "Code Doctor 已可开始" : "Code Doctor 尚未完全就绪"));
+        for (const check of report.checks) {
+            const marker = check.status === "pass" ? pc.green("✓") : check.status === "fail" ? pc.red("✗") : pc.yellow("!");
+            console.log(`${marker} ${check.message}`);
+            if (check.suggestion)
+                console.log(pc.dim(`  建议：${check.suggestion}`));
+        }
+    }
+    if (report.checks.some((check) => check.status === "fail"))
+        process.exitCode = 1;
+});
+rootOption(project.command("start").description("一键初始化、发现、分批建图、业务审计并生成唯一项目 HTML"))
+    .option("--limit <count>", "本次最多调用 Agent 建图的场景数（默认 1）", (value) => Number(value), 1)
+    .option("--agent <provider>", "auto、codex、claude 或 custom")
+    .option("--no-audit", "本次不运行项目业务风险审计")
+    .option("--open", "完成后打开项目 HTML")
+    .action(async (options) => {
+    const root = resolveRoot(options.root);
+    const config = await loadConfig(root);
+    configureAgent(config, options.agent);
+    const result = await startProject({ root, config, limit: options.limit, audit: options.audit });
+    console.log(pc.green(`项目业务审计入口：${result.htmlFile}`));
+    console.log(pc.dim(`本次 Agent 建图 ${result.attempted} 个；累计 ${result.report.coverage.mapped}/${result.report.coverage.discovered} 个场景`));
+    for (const message of result.messages)
+        console.log(pc.yellow(message));
+    if (!options.open)
+        console.log(pc.dim(`打开报告：code-doctor project open -C ${JSON.stringify(root)}`));
+    else
+        await openLocalFile(result.htmlFile);
+});
 rootOption(project.command("build").description("生成项目业务总览；使用 --all 可串行建立全部候选场景地图"))
     .option("--all", "发现并逐一建立全部候选业务场景地图")
     .option("--refresh", "与 --all 一起使用，忽略已完成状态并重新建立全部地图")
