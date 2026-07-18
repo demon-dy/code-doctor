@@ -96,4 +96,18 @@ describe("project business report", () => {
     expect(result.report.scenarios[0]?.freshness).toBe("unknown");
     await expect(fs.access(marker)).rejects.toMatchObject({ code: "ENOENT" });
   });
+
+  it("忽略结构损坏的批量运行状态并仍可生成项目报告", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "code-doctor-project-broken-state-"));
+    directories.push(root);
+    await initializeKnowledge(root);
+    const output = path.join(root, ".code-doctor", "output");
+    await fs.mkdir(output, { recursive: true });
+    await fs.writeFile(path.join(output, "project-build-run.json"), JSON.stringify({ schemaVersion: 1, scenarios: null }), "utf8");
+
+    const result = await buildProjectReport(root);
+
+    expect(result.report.coverage).toMatchObject({ discovered: 0, buildPending: 0, buildFailed: 0 });
+    await expect(fs.access(result.htmlFile)).resolves.toBeUndefined();
+  });
 });

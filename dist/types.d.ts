@@ -289,6 +289,51 @@ export interface ProjectBusinessReport {
     };
     unknownBoundaries: string[];
     audit?: ProjectAuditReport;
+    impact?: ProjectImpactReport;
+}
+export type ProjectImpactChangeStatus = "added" | "modified" | "deleted" | "renamed" | "copied" | "type_changed" | "unmerged" | "unknown";
+export type ProjectImpactBuildStatus = "pending" | "running" | "completed" | "failed" | "skipped_no_agent";
+export interface ProjectImpactChangedFile {
+    path: string;
+    previousPath?: string;
+    status: ProjectImpactChangeStatus;
+    businessSource: boolean;
+    global: boolean;
+    scenarioIds: string[];
+}
+export interface ProjectImpactScenario {
+    id: string;
+    title: string;
+    focus: string;
+    matchedFiles: string[];
+    status: ProjectImpactBuildStatus;
+    attempts: number;
+    startedAt?: string;
+    completedAt?: string;
+    failedAt?: string;
+    error?: string;
+}
+export interface ProjectImpactReport {
+    schemaVersion: 1;
+    createdAt: string;
+    updatedAt: string;
+    root: string;
+    range: string;
+    sourceCommit?: string;
+    status: "running" | "partial" | "partial_with_failures" | "completed" | "completed_with_failures";
+    useAgent: boolean;
+    limit?: number;
+    changedFiles: ProjectImpactChangedFile[];
+    impactedScenarios: ProjectImpactScenario[];
+    unchangedScenarioIds: string[];
+    unattributedFiles: string[];
+    unknownBoundaries: string[];
+    audit: {
+        status: "pending" | "completed" | "failed";
+        sourceCommit?: string;
+        agentStatus?: ProjectAuditReport["agent"]["status"];
+        error?: string;
+    };
 }
 export type ProjectAuditFindingSource = "structure" | "agent";
 export type ProjectAuditFindingStatus = "risk" | "uncertain";

@@ -35,8 +35,14 @@ describe("project initialization", () => {
     const jobs = await fs.readFile(path.join(root, ".gitlab", "code-doctor.yml"), "utf8");
     expect(jobs).toContain("code-doctor-mr-audit");
     expect(jobs).toContain("code-doctor-daily-audit");
-    expect(jobs).toContain("audit --changed");
-    expect(jobs).toContain("audit --deep --one");
+    expect(jobs).toContain("project update --changed");
+    expect(jobs).toContain("project build --all --limit");
+    expect(jobs).toContain("project audit");
+    expect(jobs).toContain("policy: pull-push");
+    expect(jobs).toContain(".code-doctor/knowledge/");
+    expect(jobs).toContain(".code-doctor/output/project-build-run.json");
+    expect(jobs).toContain(".code-doctor/output/project-report.html");
+    expect(jobs).not.toContain("audit --deep --one");
     await installGitLabCi(root, "push");
     const pushJob = await fs.readFile(path.join(root, ".gitlab", "code-doctor.yml"), "utf8");
     expect(pushJob).toContain("code-doctor-push-audit");

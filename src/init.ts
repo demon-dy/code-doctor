@@ -48,11 +48,15 @@ const MR_JOB = `code-doctor-mr-audit:
   before_script:
     - npm install --global @thunder-doctor/code-doctor
   script:
-    - code-doctor audit --changed "$CI_MERGE_REQUEST_DIFF_BASE_SHA...$CI_COMMIT_SHA"
+    - code-doctor project update --changed "$CI_MERGE_REQUEST_DIFF_BASE_SHA...$CI_COMMIT_SHA"
   artifacts:
     when: always
     expire_in: 90 days
     paths:
+      - .code-doctor/output/project-report.html
+      - .code-doctor/output/project-report.json
+      - .code-doctor/output/project-impact.json
+      - .code-doctor/output/project-audit.json
       - .code-doctor/output/
 `;
 
@@ -64,14 +68,26 @@ const DAILY_JOB = `code-doctor-daily-audit:
       when: manual
   variables:
     GIT_DEPTH: "0"
+    CODE_DOCTOR_DAILY_LIMIT: "1"
+  cache:
+    key: "code-doctor-$CI_PROJECT_PATH_SLUG-$CI_DEFAULT_BRANCH"
+    policy: pull-push
+    paths:
+      - .code-doctor/knowledge/
+      - .code-doctor/output/project-build-run.json
   before_script:
     - npm install --global @thunder-doctor/code-doctor
   script:
-    - code-doctor audit --deep --one
+    - code-doctor project build --all --limit "$CODE_DOCTOR_DAILY_LIMIT" || true
+    - code-doctor project audit
   artifacts:
     when: always
     expire_in: 90 days
     paths:
+      - .code-doctor/output/project-report.html
+      - .code-doctor/output/project-report.json
+      - .code-doctor/output/project-audit.json
+      - .code-doctor/output/project-build-run.json
       - .code-doctor/output/
 `;
 
@@ -84,11 +100,15 @@ const PUSH_JOB = `code-doctor-push-audit:
   before_script:
     - npm install --global @thunder-doctor/code-doctor
   script:
-    - code-doctor audit --changed "$CI_COMMIT_BEFORE_SHA...$CI_COMMIT_SHA"
+    - code-doctor project update --changed "$CI_COMMIT_BEFORE_SHA...$CI_COMMIT_SHA"
   artifacts:
     when: always
     expire_in: 90 days
     paths:
+      - .code-doctor/output/project-report.html
+      - .code-doctor/output/project-report.json
+      - .code-doctor/output/project-impact.json
+      - .code-doctor/output/project-audit.json
       - .code-doctor/output/
 `;
 

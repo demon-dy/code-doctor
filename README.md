@@ -205,6 +205,36 @@ code-doctor project audit --no-agent
 审计只覆盖已建图场景。未建图场景、过期地图、缺失证据文件和未完成的 Agent 审计都会
 进入“未知与审计边界”，因此即使风险列表为空，也不等于项目业务安全。
 
+### Git 增量业务更新
+
+日常提交不需要重建整个项目。`project update` 读取 Git 的新增、修改、删除和重命名，
+同时用场景目录的 `evidenceFiles` 与地图里的源码证据定位受影响场景，再严格串行重建这些
+场景、重跑项目级业务风险审计，最后仍只更新 `project-report.html` 这一个入口：
+
+```bash
+# CI 推荐显式传入完整范围
+code-doctor project update --changed origin/main...HEAD
+
+# 本地以某个分支为基线
+code-doctor project update --base origin/main
+
+# 本地省略范围时，明确默认审计最近一次提交：HEAD^...HEAD
+code-doctor project update
+
+# 大范围变更可以分批；同一范围再次执行会从 project-impact.json 恢复
+code-doctor project update --changed origin/main...HEAD --limit 2
+
+# 没有 Agent 凭证时仍生成影响边界和确定性结构审计，不会声称地图已更新
+code-doctor project update --changed HEAD^...HEAD --no-agent
+```
+
+Git 参数通过无 shell 的参数数组执行，并限制为单个安全 revision/range；不会把 CI 变量
+或知识文件内容拼成 shell 命令。结果持久化到
+`.code-doctor/output/project-impact.json`，包含变更状态、受影响/无直接关联场景、未归属
+文件、每个场景重建状态、Agent 失败原因和审计提交。删除与重命名同时使用旧、新路径
+匹配证据。未归属业务源码、全局入口/依赖/配置变化和所有未建图场景都会进入未知边界，
+“没有直接证据关联”不等于“业务未受影响”。
+
 ## AI 业务地图
 
 先明确一个业务场景、页面、入口或问题，让 Agent 聚焦理解，而不是一次吞下整个历史系统：
@@ -348,14 +378,17 @@ scanners:
 人工触发：
 
 ```bash
-# 只审计某次 Git 变更实际影响的已沉淀场景
-code-doctor audit --changed origin/main...HEAD
+# 按某次 Git 变更重建受影响地图、重跑项目审计并更新项目总览
+code-doctor project update --changed origin/main...HEAD
 
-# 每天深入检查一个历史业务场景
-code-doctor audit --deep --one
+# 每天分批补全历史场景，再审计当前全部已建图业务
+code-doctor project build --all --limit 1
+code-doctor project audit
 ```
 
-变更文件通过场景地图中的源码证据关联到业务场景。没有被任何场景覆盖的变更不会伪装成“无影响”，而会明确记为知识覆盖缺口。
+旧的 `code-doctor audit --changed/--deep` 仍保留兼容，但它只生成逐场景需求检查，
+不再是默认 CI 主流程。项目级流程会把影响、覆盖、结构风险、AI 业务风险和未知边界聚合
+到同一个 HTML。
 
 GitLab 可以选择 MR、每日或两种模式同时安装：
 
@@ -366,10 +399,10 @@ code-doctor ci install --mode both
 
 生成的 CI 默认执行：
 
-- Merge Request：`audit --changed "$CI_MERGE_REQUEST_DIFF_BASE_SHA...$CI_COMMIT_SHA"`；
-- 每次 Push：`audit --changed "$CI_COMMIT_BEFORE_SHA...$CI_COMMIT_SHA"`；
-- Schedule：`audit --deep --one`；
-- Web Pipeline：可手动触发每日深度审计。
+- Merge Request：`project update --changed "$CI_MERGE_REQUEST_DIFF_BASE_SHA...$CI_COMMIT_SHA"`；
+- 每次 Push：`project update --changed "$CI_COMMIT_BEFORE_SHA...$CI_COMMIT_SHA"`；
+- Schedule：`project build --all --limit "$CODE_DOCTOR_DAILY_LIMIT"` 后运行 `project audit`；
+- Web Pipeline：可手动触发同一套分批补图与项目审计。
 
 `both` 表示 MR + 每日，`all` 表示 MR + 每次 Push + 每日。提交生成的 `.gitlab/code-doctor.yml` 后，如启用 daily 模式，在 GitLab 的 **CI/CD → Schedules** 中创建每日 Pipeline。CI 需要：
 
@@ -377,7 +410,10 @@ code-doctor ci install --mode both
 - 可用的 `CODEX_API_KEY`、`ANTHROPIC_API_KEY` 或自定义 Agent 凭证；
 - 目标项目依赖和测试环境。
 
-持续审计只读代码并生成 Artifact，不需要推送权限。只有继续使用旧的 `run --one --open-mr` 自动修复流程时，才需要允许推送 `code-doctor/*` 分支和创建 MR 的 GitLab Token。
+CI Artifact 明确包含 `project-report.html`、项目报告 JSON、增量影响 JSON、项目审计 JSON
+和 Agent 日志。持续审计只读业务代码，只会更新 `.code-doctor/output/` 与候选知识产物，
+不需要推送权限。只有继续使用旧的 `run --one --open-mr` 自动修复流程时，才需要允许
+推送 `code-doctor/*` 分支和创建 MR 的 GitLab Token。
 
 默认模板从 npmjs 公开包安装，不需要读取私有 npm Registry。
 

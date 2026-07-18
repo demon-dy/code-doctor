@@ -11,6 +11,7 @@ import type {
   ProjectBusinessReport,
   ProjectAuditReport,
   ProjectBuildRunState,
+  ProjectImpactReport,
   ProjectReportScenario,
 } from "../types.js";
 import { ensureOutputDirectory, pathExists, writeJson } from "../utils.js";
@@ -174,7 +175,7 @@ export const buildProjectReport = async (root: string): Promise<{
 }> => {
   await initializeKnowledge(root);
   const knowledge = knowledgeDirectory(root);
-  const [atlasEntries, atlasDocument, project, candidateProject, head, buildRunValue, auditValue] = await Promise.all([
+  const [atlasEntries, atlasDocument, project, candidateProject, head, buildRunValue, auditValue, impactValue] = await Promise.all([
     listScenarios(root),
     readYaml<KnowledgeAtlas>(path.join(knowledge, "atlas.yaml")),
     readYaml<{ name?: string; summary?: string }>(path.join(knowledge, "project.yaml")),
@@ -182,6 +183,7 @@ export const buildProjectReport = async (root: string): Promise<{
     currentCommit(root),
     readJson(path.join(root, ".code-doctor", "output", "project-build-run.json")),
     readJson(path.join(root, ".code-doctor", "output", "project-audit.json")),
+    readJson(path.join(root, ".code-doctor", "output", "project-impact.json")),
   ]);
   const atlas = [...atlasEntries, ...await orphanScenarioEntries(root, new Set(atlasEntries.map((entry) => entry.id)))];
   const buildRun = buildRunValue as ProjectBuildRunState | undefined;
@@ -271,6 +273,21 @@ export const buildProjectReport = async (root: string): Promise<{
     const auditMaps = new Map((audit.auditedScenarios ?? []).map((item) => [item.id, item.mapCreatedAt]));
     const changedAuditMaps = scenarios.filter((scenario) => scenario.map && auditMaps.get(scenario.id) !== scenario.map.createdAt);
     if (changedAuditMaps.length) report.unknownBoundaries.push(`${changedAuditMaps.length} 个场景地图在项目风险审计后发生变化，需要重新运行 project audit。`);
+    report.unknownBoundaries = [...new Set(report.unknownBoundaries)];
+  }
+  const impact = impactValue as Partial<ProjectImpactReport> | undefined;
+  if (impact?.schemaVersion === 1
+    && Array.isArray(impact.changedFiles)
+    && impact.changedFiles.every((file) => file && Array.isArray(file.scenarioIds))
+    && Array.isArray(impact.impactedScenarios)
+    && Array.isArray(impact.unchangedScenarioIds)
+    && Array.isArray(impact.unattributedFiles)
+    && Array.isArray(impact.unknownBoundaries)
+    && impact.audit) {
+    report.impact = impact as ProjectImpactReport;
+    report.unknownBoundaries.push(...impact.unknownBoundaries);
+    if (impact.sourceCommit && head && impact.sourceCommit !== head) report.unknownBoundaries.push("最近一次 Git 变更影响分析对应的源码提交已变化，需要重新运行 project update。");
+    if (impact.audit.status === "failed") report.unknownBoundaries.push("最近一次增量更新后的项目审计失败，报告中的风险结论可能已过期。");
     report.unknownBoundaries = [...new Set(report.unknownBoundaries)];
   }
   const output = await ensureOutputDirectory(root);

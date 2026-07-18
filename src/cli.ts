@@ -29,6 +29,7 @@ import { scanFailureMessages, scanProject } from "./scan.js";
 import { buildProjectReport } from "./project-report/build.js";
 import { runAllProjectScenarios } from "./project-report/run-all.js";
 import { auditProjectBusiness } from "./project-audit/audit.js";
+import { rangeFromBase, updateProjectFromGit } from "./project-report/update.js";
 
 const rootOption = (command: Command): Command =>
   command.option("-C, --root <directory>", "项目根目录", process.cwd());
@@ -231,6 +232,30 @@ rootOption(project.command("audit").description("检测全项目业务断链，�
     console.log(pc.dim(`结构扫描 ${result.audit.summary.structure} 项，AI 业务审计 ${result.audit.summary.agent} 项；风险 ${result.audit.summary.risk} 项，需复核 ${result.audit.summary.uncertain} 项`));
     if (result.audit.agent.status === "failed") {
       console.error(pc.yellow(`AI 审计未完成，确定性结果已保留：${result.audit.agent.error}`));
+      process.exitCode = 1;
+    }
+  });
+
+rootOption(project.command("update").description("按 Git 变更重建受影响业务场景、重跑项目审计并更新唯一总览"))
+  .option("--changed <git-range>", "Git diff 范围；省略时默认 HEAD^...HEAD")
+  .option("--base <git-ref>", "以指定 ref 为基线，等价于 <base>...HEAD")
+  .option("--limit <count>", "本次最多调用 Agent 重建的受影响场景数", (value) => Number(value))
+  .option("--agent <provider>", "auto、codex、claude 或 custom")
+  .option("--no-agent", "不调用 Agent：只分析影响并运行确定性项目审计")
+  .action(async (options: { root: string; changed?: string; base?: string; limit?: number; agent?: string | false }) => {
+    if (options.changed && options.base) throw new Error("--changed 和 --base 不能同时使用");
+    const root = resolveRoot(options.root);
+    const config = await loadConfig(root);
+    if (typeof options.agent === "string") configureAgent(config, options.agent);
+    const range = options.changed ?? (options.base ? rangeFromBase(options.base) : "HEAD^...HEAD");
+    const result = await updateProjectFromGit({ root, config, range, limit: options.limit, useAgent: options.agent !== false });
+    console.log(pc.green(`项目增量业务审计已更新：${result.htmlFile}`));
+    console.log(pc.dim(`范围 ${result.impact.range}：${result.impact.changedFiles.length} 个变更文件，${result.impact.impactedScenarios.length} 个受影响场景，${result.impact.unattributedFiles.length} 个未归属文件`));
+    const pending = result.impact.impactedScenarios.filter((scenario) => scenario.status === "pending" || scenario.status === "skipped_no_agent").length;
+    const failed = result.impact.impactedScenarios.filter((scenario) => scenario.status === "failed").length;
+    if (pending) console.log(pc.yellow(`${pending} 个受影响场景尚未重建；再次运行相同范围可继续`));
+    if (failed || result.impact.audit.status === "failed") {
+      console.error(pc.yellow(`增量更新存在失败，确定性结果和边界已保留：${result.impactFile}`));
       process.exitCode = 1;
     }
   });
