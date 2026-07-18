@@ -223,6 +223,27 @@ export interface KnowledgeAtlas {
 }
 export type ProjectScenarioState = "unmapped" | "mapped" | "reviewed" | "pending_review";
 export type ProjectScenarioFreshness = "current" | "stale" | "unknown";
+export type ProjectBuildScenarioStatus = "pending" | "running" | "completed" | "failed";
+export interface ProjectBuildScenarioRun {
+    id: string;
+    title: string;
+    focus: string;
+    status: ProjectBuildScenarioStatus;
+    attempts: number;
+    startedAt?: string;
+    completedAt?: string;
+    failedAt?: string;
+    error?: string;
+}
+export interface ProjectBuildRunState {
+    schemaVersion: 1;
+    startedAt: string;
+    updatedAt: string;
+    completedAt?: string;
+    status: "running" | "completed" | "completed_with_failures" | "partial";
+    discoveryPerformed: boolean;
+    scenarios: ProjectBuildScenarioRun[];
+}
 export interface ProjectReportScenario {
     id: string;
     title: string;
@@ -234,6 +255,8 @@ export interface ProjectReportScenario {
     missingEvidenceFiles: string[];
     state: ProjectScenarioState;
     freshness: ProjectScenarioFreshness;
+    buildStatus?: ProjectBuildScenarioStatus;
+    buildError?: string;
     updatedAt: string;
     sourceCommit?: string;
     changedEvidenceFiles: string[];
@@ -257,6 +280,8 @@ export interface ProjectBusinessReport {
         reviewed: number;
         pendingReview: number;
         stale: number;
+        buildPending: number;
+        buildFailed: number;
         evidenceFiles: number;
         existingEvidenceFiles: number;
         mapPercent: number;

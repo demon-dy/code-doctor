@@ -55,7 +55,7 @@ export const buildBusinessMap = async (input) => {
     });
     await fs.writeFile(promptFile, `${buildPrompt(taskFile)}\n`, "utf8");
     const sourceState = await captureBusinessSourceState(input.root);
-    const agent = await runConfiguredAgent({ root: input.root, config: input.config.agent, promptFile, artifactPrefix: "map" });
+    const agent = await runConfiguredAgent({ root: input.root, config: input.config.agent, promptFile, artifactPrefix: input.artifactPrefix ?? "map" });
     await assertBusinessSourceUnchanged(input.root, sourceState);
     if (agent.exitCode !== 0)
         throw new Error(`业务地图 Agent 执行失败，退出码 ${agent.exitCode}`);

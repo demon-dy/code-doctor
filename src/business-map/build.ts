@@ -34,6 +34,7 @@ export const buildBusinessMap = async (input: {
   focus: string;
   scenarioId?: string;
   persist?: boolean;
+  artifactPrefix?: string;
 }): Promise<{ map: BusinessMap; jsonFile: string; htmlFile: string; knowledge?: { id: string; file: string } }> => {
   if (!input.config.businessMap.enabled) throw new Error("businessMap.enabled=false，AI 业务地图已被项目配置禁用");
   const output = await ensureOutputDirectory(input.root);
@@ -63,7 +64,7 @@ export const buildBusinessMap = async (input: {
   });
   await fs.writeFile(promptFile, `${buildPrompt(taskFile)}\n`, "utf8");
   const sourceState = await captureBusinessSourceState(input.root);
-  const agent = await runConfiguredAgent({ root: input.root, config: input.config.agent, promptFile, artifactPrefix: "map" });
+  const agent = await runConfiguredAgent({ root: input.root, config: input.config.agent, promptFile, artifactPrefix: input.artifactPrefix ?? "map" });
   await assertBusinessSourceUnchanged(input.root, sourceState);
   if (agent.exitCode !== 0) throw new Error(`业务地图 Agent 执行失败，退出码 ${agent.exitCode}`);
   let raw: unknown;

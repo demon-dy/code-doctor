@@ -27,6 +27,7 @@ import {
 } from "./knowledge.js";
 import { scanFailureMessages, scanProject } from "./scan.js";
 import { buildProjectReport } from "./project-report/build.js";
+import { runAllProjectScenarios } from "./project-report/run-all.js";
 
 const rootOption = (command: Command): Command =>
   command.option("-C, --root <directory>", "项目根目录", process.cwd());
@@ -183,9 +184,27 @@ rootOption(map.command("open").description("打开最近生成的 AI 业务地�
 
 const project = program.command("project").description("聚合整个项目的业务场景、覆盖状态、未知边界和下钻地图");
 
-rootOption(project.command("build").description("从项目知识目录生成自包含项目业务审计总览"))
-  .action(async (options: { root: string }) => {
+rootOption(project.command("build").description("生成项目业务总览；使用 --all 可串行建立全部候选场景地图"))
+  .option("--all", "发现并逐一建立全部候选业务场景地图")
+  .option("--refresh", "与 --all 一起使用，忽略已完成状态并重新建立全部地图")
+  .option("--limit <count>", "与 --all 一起使用，本次最多调用 Agent 建图的场景数", (value) => Number(value))
+  .option("--agent <provider>", "与 --all 一起使用：auto、codex、claude 或 custom")
+  .action(async (options: { root: string; all?: boolean; refresh?: boolean; limit?: number; agent?: string }) => {
     const root = resolveRoot(options.root);
+    if (options.all) {
+      const config = await loadConfig(root);
+      configureAgent(config, options.agent);
+      const result = await runAllProjectScenarios({ root, config, refresh: options.refresh, limit: options.limit });
+      console.log(pc.green(`项目业务审计总览已生成：${result.htmlFile}`));
+      console.log(pc.dim(`本次串行处理 ${result.attempted} 个；累计完成 ${result.completed}/${result.state.scenarios.length} 个，失败 ${result.failed} 个`));
+      if (result.state.status === "partial") console.log(pc.yellow(`仍有待处理场景；再次运行相同命令将从 ${result.stateFile} 继续`));
+      if (result.failed) {
+        console.error(pc.red(`${result.failed} 个场景建图失败；其他结果已保留，再次运行将只重试未完成场景`));
+        process.exitCode = 1;
+      }
+      return;
+    }
+    if (options.refresh || options.limit !== undefined || options.agent) throw new Error("--refresh、--limit 和 --agent 需要与 --all 一起使用");
     const result = await buildProjectReport(root);
     console.log(pc.green(`项目业务审计总览已生成：${result.htmlFile}`));
     console.log(pc.dim(`${result.report.coverage.discovered} 个候选场景，${result.report.coverage.mapped} 个已建图，${result.report.coverage.reviewed} 个已确认`));

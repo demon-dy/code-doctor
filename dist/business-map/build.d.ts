@@ -5,6 +5,7 @@ export declare const buildBusinessMap: (input: {
     focus: string;
     scenarioId?: string;
     persist?: boolean;
+    artifactPrefix?: string;
 }) => Promise<{
     map: BusinessMap;
     jsonFile: string;

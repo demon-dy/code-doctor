@@ -44,6 +44,7 @@ code-doctor scan
 code-doctor graph
 code-doctor map build --focus "首页会员弹窗" --id home-popup
 code-doctor map confirm home-popup --by "业务Owner"
+code-doctor project build --all
 code-doctor project build
 code-doctor project open
 code-doctor map open
@@ -127,9 +128,31 @@ code-doctor takeover progress
 `map discover` 和逐场景 `map build` 的长期知识可以聚合成一个项目级入口：
 
 ```bash
+# 第一次全量建立项目地图：没有场景目录时会先发现，再严格串行逐场景建图
+code-doctor project build --all
+
+# 只重新聚合已有知识，不调用 Agent
 code-doctor project build
 code-doctor project open
 ```
+
+全量建图可能需要较长时间，因此每个场景开始、成功或失败后都会立即更新
+`.code-doctor/output/project-build-run.json`。运行被中断后再次执行 `project build --all`，
+会跳过已有地图和已完成项，只重试失败或未处理项；单场景失败不会删除其他场景结果，最终报告也会明确显示失败和待处理边界。常用控制：
+
+```bash
+# 本次最多处理 3 个场景，适合定时任务分批运行
+code-doctor project build --all --limit 3
+
+# 忽略完成状态，强制重新建立所有场景地图
+code-doctor project build --all --refresh
+
+# 临时指定 Agent，仍兼容项目 code-doctor.yaml 的 custom 配置
+code-doctor project build --all --agent claude
+```
+
+场景按 `dependsOn` 的依赖拓扑顺序处理，同一可执行层内按 critical、high、normal
+和稳定 id 排序。Agent 始终逐一运行，不会并发争用同一个代码工作区或候选输出文件。
 
 生成 `.code-doctor/output/project-report.json` 和自包含的
 `.code-doctor/output/project-report.html`。HTML 不需要部署服务或访问 CDN，交给其他人即可离线打开。
@@ -141,6 +164,7 @@ code-doctor project open
 - 场景地图证据代码变化后的待审状态；
 - 业务建图覆盖率、人工确认覆盖率和证据文件可用率；
 - 未建图场景、缺失证据、AI 不确定项和证据冲突等审计边界；
+- 全量运行中的待处理、失败原因和已完成覆盖，失败不会被误报成“没有业务”；
 - 从项目全景下钻到单场景的章节、节点、路径条件和源码证据。
 
 这份报告明确表达“当前发现并获得证据的业务”，不会把未建图范围隐藏起来，也不会把
