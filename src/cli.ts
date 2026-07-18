@@ -28,6 +28,7 @@ import {
 import { scanFailureMessages, scanProject } from "./scan.js";
 import { buildProjectReport } from "./project-report/build.js";
 import { runAllProjectScenarios } from "./project-report/run-all.js";
+import { auditProjectBusiness } from "./project-audit/audit.js";
 
 const rootOption = (command: Command): Command =>
   command.option("-C, --root <directory>", "项目根目录", process.cwd());
@@ -216,6 +217,22 @@ rootOption(project.command("open").description("打开最近生成的项目业�
     const file = path.join(resolveRoot(options.root), ".code-doctor", "output", "project-report.html");
     await openLocalFile(file);
     console.log(file);
+  });
+
+rootOption(project.command("audit").description("检测全项目业务断链，并让 Agent 复核跨场景业务逻辑风险"))
+  .option("--agent <provider>", "auto、codex、claude 或 custom")
+  .option("--no-agent", "只运行确定性结构审计，不调用 Agent")
+  .action(async (options: { root: string; agent?: string | false }) => {
+    const root = resolveRoot(options.root);
+    const config = await loadConfig(root);
+    if (typeof options.agent === "string") configureAgent(config, options.agent);
+    const result = await auditProjectBusiness({ root, config, useAgent: options.agent !== false });
+    console.log(pc.green(`项目业务风险审计已聚合到：${result.htmlFile}`));
+    console.log(pc.dim(`结构扫描 ${result.audit.summary.structure} 项，AI 业务审计 ${result.audit.summary.agent} 项；风险 ${result.audit.summary.risk} 项，需复核 ${result.audit.summary.uncertain} 项`));
+    if (result.audit.agent.status === "failed") {
+      console.error(pc.yellow(`AI 审计未完成，确定性结果已保留：${result.audit.agent.error}`));
+      process.exitCode = 1;
+    }
   });
 
 const takeover = program.command("takeover").description("帮助新 Owner 渐进式理解和接管项目");

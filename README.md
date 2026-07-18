@@ -134,6 +134,9 @@ code-doctor project build --all
 # 只重新聚合已有知识，不调用 Agent
 code-doctor project build
 code-doctor project open
+
+# 在已有项目地图上检测结构断链，并让 Agent 审计跨场景业务逻辑
+code-doctor project audit
 ```
 
 全量建图可能需要较长时间，因此每个场景开始、成功或失败后都会立即更新
@@ -170,6 +173,37 @@ code-doctor project build --all --agent claude
 这份报告明确表达“当前发现并获得证据的业务”，不会把未建图范围隐藏起来，也不会把
 “已扫描代码”错误表述成“已证明不存在业务漏洞”。旧版直接保存 BusinessMap 的
 `scenarios/*.json` 知识目录仍可读取。
+
+### 项目级业务风险审计
+
+`code-doctor project audit` 先运行不依赖 AI 的确定性图结构检查，再让配置的 Agent
+基于所有已建图场景和源码证据复核业务语义。两层结果都会写入
+`.code-doctor/output/project-audit.json`，并聚合进同一个
+`.code-doctor/output/project-report.html`；不会生成另一个需要来回切换的报告入口。
+
+确定性层检查无入口、无结果、非结果节点死端、判断节点分支不足、空白或重复条件、
+孤立组件、证据缺失和证据冲突。这些信号只表述为“结构风险/需复核”，不会仅凭图结构
+宣称代码一定存在业务漏洞。AI 层专门检查不可达业务结果或弹窗、条件覆盖和互斥错误、
+状态转换缺口、跨场景规则矛盾与副作用遗漏；命名、格式、lint 等机械问题不进入该报告。
+
+每条 AI 结论必须回指现有的场景 id、节点 id 和证据 id。引用不存在时整次 AI 候选会被
+拒绝；没有 source、test、runtime 或 human 强证据的结论会自动降为 `uncertain`。
+Agent 退出失败、输出无效或修改业务工作区时，确定性结果仍会持久化，并在 HTML 中明确
+标注“AI 审计未完成”，不会把失败伪装成零风险。
+
+```bash
+# 完整结构 + AI 业务逻辑审计（默认使用 code-doctor.yaml 中的 Agent）
+code-doctor project audit
+
+# 临时指定 Agent
+code-doctor project audit --agent claude
+
+# CI 或离线环境只做确定性结构审计
+code-doctor project audit --no-agent
+```
+
+审计只覆盖已建图场景。未建图场景、过期地图、缺失证据文件和未完成的 Agent 审计都会
+进入“未知与审计边界”，因此即使风险列表为空，也不等于项目业务安全。
 
 ## AI 业务地图
 

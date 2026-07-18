@@ -336,6 +336,83 @@ export interface ProjectBusinessReport {
     reviewPercent: number;
   };
   unknownBoundaries: string[];
+  audit?: ProjectAuditReport;
+}
+
+export type ProjectAuditFindingSource = "structure" | "agent";
+export type ProjectAuditFindingStatus = "risk" | "uncertain";
+export type ProjectAuditCategory =
+  | "missing_entry"
+  | "missing_outcome"
+  | "dead_end"
+  | "decision_branch"
+  | "unreachable"
+  | "guard_conflict"
+  | "evidence_gap"
+  | "evidence_conflict"
+  | "unreachable_business_outcome"
+  | "condition_coverage"
+  | "state_transition"
+  | "cross_scenario_conflict"
+  | "missing_side_effect"
+  | "other_business_logic";
+
+export interface ProjectAuditNodeReference {
+  scenarioId: string;
+  nodeId: string;
+}
+
+export interface ProjectAuditEvidenceReference {
+  scenarioId: string;
+  evidenceId: string;
+}
+
+export interface ProjectAuditFinding {
+  id: string;
+  source: ProjectAuditFindingSource;
+  category: ProjectAuditCategory;
+  status: ProjectAuditFindingStatus;
+  severity: Severity;
+  title: string;
+  conclusion: string;
+  reasoning: string[];
+  relatedScenarioIds: string[];
+  relatedNodes: ProjectAuditNodeReference[];
+  evidence: ProjectAuditEvidenceReference[];
+  confidence: number;
+  recommendation?: string;
+}
+
+export interface ProjectAuditReport {
+  schemaVersion: 1;
+  createdAt: string;
+  root: string;
+  sourceCommit?: string;
+  mappedScenarioCount: number;
+  discoveredScenarioCount: number;
+  auditedScenarios: Array<{
+    id: string;
+    mapCreatedAt: string;
+    freshness: ProjectScenarioFreshness;
+  }>;
+  findings: ProjectAuditFinding[];
+  summary: {
+    risk: number;
+    uncertain: number;
+    error: number;
+    warning: number;
+    structure: number;
+    agent: number;
+  };
+  agent: {
+    status: "completed" | "skipped" | "failed";
+    provider?: string;
+    durationMs?: number;
+    conclusion?: string;
+    unansweredQuestions?: string[];
+    error?: string;
+  };
+  boundaries: string[];
 }
 
 export interface KnowledgeRule {

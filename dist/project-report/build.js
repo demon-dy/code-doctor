@@ -157,13 +157,14 @@ const buildScenario = async (root, entry, head, buildRun) => {
 export const buildProjectReport = async (root) => {
     await initializeKnowledge(root);
     const knowledge = knowledgeDirectory(root);
-    const [atlasEntries, atlasDocument, project, candidateProject, head, buildRunValue] = await Promise.all([
+    const [atlasEntries, atlasDocument, project, candidateProject, head, buildRunValue, auditValue] = await Promise.all([
         listScenarios(root),
         readYaml(path.join(knowledge, "atlas.yaml")),
         readYaml(path.join(knowledge, "project.yaml")),
         readYaml(path.join(knowledge, "project.candidate.yaml")),
         currentCommit(root),
         readJson(path.join(root, ".code-doctor", "output", "project-build-run.json")),
+        readJson(path.join(root, ".code-doctor", "output", "project-audit.json")),
     ]);
     const atlas = [...atlasEntries, ...await orphanScenarioEntries(root, new Set(atlasEntries.map((entry) => entry.id)))];
     const buildRun = buildRunValue;
@@ -263,6 +264,17 @@ export const buildProjectReport = async (root) => {
         },
         unknownBoundaries: [...new Set(unknownBoundaries)],
     };
+    const audit = auditValue;
+    if (audit?.schemaVersion === 1 && Array.isArray(audit.findings) && audit.agent && audit.summary && Array.isArray(audit.boundaries)) {
+        report.audit = audit;
+        if (audit.sourceCommit && head && audit.sourceCommit !== head)
+            report.unknownBoundaries.push("项目风险审计生成后源码提交已变化，需要重新运行 project audit。");
+        const auditMaps = new Map((audit.auditedScenarios ?? []).map((item) => [item.id, item.mapCreatedAt]));
+        const changedAuditMaps = scenarios.filter((scenario) => scenario.map && auditMaps.get(scenario.id) !== scenario.map.createdAt);
+        if (changedAuditMaps.length)
+            report.unknownBoundaries.push(`${changedAuditMaps.length} 个场景地图在项目风险审计后发生变化，需要重新运行 project audit。`);
+        report.unknownBoundaries = [...new Set(report.unknownBoundaries)];
+    }
     const output = await ensureOutputDirectory(root);
     const jsonFile = path.join(output, "project-report.json");
     const htmlFile = path.join(output, "project-report.html");
