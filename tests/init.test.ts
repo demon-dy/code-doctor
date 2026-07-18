@@ -18,7 +18,10 @@ describe("project initialization", () => {
     await initializeProject(root);
     const gitignore = await fs.readFile(path.join(root, ".gitignore"), "utf8");
     expect(gitignore.match(/\.code-doctor\/output\//g)).toHaveLength(1);
+    expect(gitignore.match(/\.code-doctor\/cache\//g)).toHaveLength(1);
     expect(await fs.readFile(path.join(root, "code-doctor.yaml"), "utf8")).toContain("version: 1");
+    expect(await fs.readFile(path.join(root, ".code-doctor", "knowledge", "atlas.yaml"), "utf8")).toContain("scenarios: []");
+    expect(await fs.readFile(path.join(root, ".code-doctor", "knowledge", "takeover.yaml"), "utf8")).toContain("scenarios: []");
   });
 
   it("把 GitLab CI include 合并进已有配置", async () => {
@@ -29,5 +32,15 @@ describe("project initialization", () => {
     const ci = await fs.readFile(path.join(root, ".gitlab-ci.yml"), "utf8");
     expect(ci).toContain(".gitlab/base.yml");
     expect(ci).toContain(".gitlab/code-doctor.yml");
+    const jobs = await fs.readFile(path.join(root, ".gitlab", "code-doctor.yml"), "utf8");
+    expect(jobs).toContain("code-doctor-mr-audit");
+    expect(jobs).toContain("code-doctor-daily-audit");
+    expect(jobs).toContain("audit --changed");
+    expect(jobs).toContain("audit --deep --one");
+    await installGitLabCi(root, "push");
+    const pushJob = await fs.readFile(path.join(root, ".gitlab", "code-doctor.yml"), "utf8");
+    expect(pushJob).toContain("code-doctor-push-audit");
+    expect(pushJob).toContain("CI_COMMIT_BEFORE_SHA...$CI_COMMIT_SHA");
+    expect(pushJob).not.toContain("code-doctor-daily-audit");
   });
 });

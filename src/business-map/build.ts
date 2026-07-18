@@ -8,6 +8,7 @@ import { ensureOutputDirectory, writeJson } from "../utils.js";
 import { renderBusinessMap } from "./render.js";
 import { finalizeBusinessMap } from "./schema.js";
 import { assertBusinessSourceUnchanged, captureBusinessSourceState } from "./worktree.js";
+import { saveScenarioCandidate } from "../knowledge.js";
 
 const buildPrompt = (taskFile: string): string => `你是 Code Doctor 的 AI 业务代码审计 Agent。请读取任务文件：${taskFile}
 
@@ -30,7 +31,9 @@ export const buildBusinessMap = async (input: {
   root: string;
   config: CodeDoctorConfig;
   focus: string;
-}): Promise<{ map: BusinessMap; jsonFile: string; htmlFile: string }> => {
+  scenarioId?: string;
+  persist?: boolean;
+}): Promise<{ map: BusinessMap; jsonFile: string; htmlFile: string; knowledge?: { id: string; file: string } }> => {
   if (!input.config.businessMap.enabled) throw new Error("businessMap.enabled=false，AI 业务地图已被项目配置禁用");
   const output = await ensureOutputDirectory(input.root);
   const graph = await analyzeCodeGraph({ root: input.root, config: input.config });
@@ -84,5 +87,8 @@ export const buildBusinessMap = async (input: {
     evidence: map.evidence.length,
     technicalGraph: graph.stats,
   });
-  return { map, jsonFile, htmlFile };
+  const knowledge = input.persist === false
+    ? undefined
+    : await saveScenarioCandidate({ root: input.root, map, id: input.scenarioId });
+  return { map, jsonFile, htmlFile, knowledge };
 };

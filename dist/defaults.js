@@ -42,6 +42,9 @@ export const DEFAULT_CONFIG = {
         maxNodes: 80,
         maxEvidence: 200,
     },
+    audit: {
+        maxScenariosPerRun: 3,
+    },
     gitlab: {
         enabled: true,
         remote: "origin",

@@ -44,6 +44,9 @@ export const DEFAULT_CONFIG: CodeDoctorConfig = {
     maxNodes: 80,
     maxEvidence: 200,
   },
+  audit: {
+    maxScenariosPerRun: 3,
+  },
   gitlab: {
     enabled: true,
     remote: "origin",

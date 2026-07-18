@@ -45,6 +45,10 @@ export interface BusinessMapConfig {
   maxEvidence: number;
 }
 
+export interface AuditConfig {
+  maxScenariosPerRun: number;
+}
+
 export interface GitLabConfig {
   enabled: boolean;
   remote: string;
@@ -59,6 +63,7 @@ export interface CodeDoctorConfig {
   verify: string[];
   graph: GraphConfig;
   businessMap: BusinessMapConfig;
+  audit: AuditConfig;
   gitlab: GitLabConfig;
   limits: {
     maxChangedFiles: number;
@@ -215,6 +220,67 @@ export interface BusinessAuditReport {
     provider: string;
     durationMs: number;
   };
+}
+
+export type KnowledgeStatusValue = "candidate" | "reviewed";
+
+export interface KnowledgeScenarioRecord {
+  schemaVersion: 1;
+  id: string;
+  title: string;
+  focus: string;
+  status: KnowledgeStatusValue;
+  createdAt: string;
+  updatedAt: string;
+  sourceCommit?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  map: BusinessMap;
+}
+
+export interface KnowledgeAtlasEntry {
+  id: string;
+  title: string;
+  focus: string;
+  status: KnowledgeStatusValue;
+  updatedAt: string;
+  candidateAvailable?: boolean;
+  summary?: string;
+  priority?: "critical" | "high" | "normal";
+  dependsOn?: string[];
+  evidenceFiles?: string[];
+}
+
+export interface KnowledgeAtlas {
+  schemaVersion: 1;
+  updatedAt: string;
+  scenarios: KnowledgeAtlasEntry[];
+}
+
+export interface KnowledgeRule {
+  id: string;
+  scenarioId: string;
+  statement: string;
+  status: "confirmed";
+  confirmedBy: string;
+  confirmedAt: string;
+  updatedAt: string;
+}
+
+export type TakeoverScenarioStatus = "unstarted" | "in_progress" | "understood";
+
+export interface TakeoverState {
+  schemaVersion: 1;
+  startedAt?: string;
+  updatedAt: string;
+  owner?: string;
+  scenarios: Array<{
+    id: string;
+    title: string;
+    status: TakeoverScenarioStatus;
+    confirmedBy?: string;
+    confirmedAt?: string;
+  }>;
 }
 
 export interface AgentRunResult {

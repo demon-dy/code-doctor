@@ -7,6 +7,7 @@ import { ensureOutputDirectory, writeJson } from "../utils.js";
 import { renderBusinessMap } from "./render.js";
 import { finalizeBusinessMap } from "./schema.js";
 import { assertBusinessSourceUnchanged, captureBusinessSourceState } from "./worktree.js";
+import { saveScenarioCandidate } from "../knowledge.js";
 const buildPrompt = (taskFile) => `你是 Code Doctor 的 AI 业务代码审计 Agent。请读取任务文件：${taskFile}
 
 你的目标不是罗列函数，而是理解代码表达的业务行为，并把复杂实现压缩成一张人类能读懂的业务执行图。
@@ -81,6 +82,9 @@ export const buildBusinessMap = async (input) => {
         evidence: map.evidence.length,
         technicalGraph: graph.stats,
     });
-    return { map, jsonFile, htmlFile };
+    const knowledge = input.persist === false
+        ? undefined
+        : await saveScenarioCandidate({ root: input.root, map, id: input.scenarioId });
+    return { map, jsonFile, htmlFile, knowledge };
 };
 //# sourceMappingURL=build.js.map

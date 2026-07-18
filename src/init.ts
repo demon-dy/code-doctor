@@ -3,9 +3,14 @@ import path from "node:path";
 import YAML from "yaml";
 import { CONFIG_FILE, renderDefaultConfig } from "./config.js";
 import { pathExists } from "./utils.js";
+import { initializeKnowledge } from "./knowledge.js";
 
 const GITIGNORE_ENTRIES = [
   ".code-doctor/output/",
+  ".code-doctor/cache/",
+  ".code-doctor/snapshots/",
+  ".code-doctor/*-task.json",
+  ".code-doctor/*-prompt.md",
   ".code-doctor/task.json",
   ".code-doctor/prompt.md",
 ];
@@ -30,10 +35,28 @@ export const initializeProject = async (root: string): Promise<string[]> => {
     created.push(".gitignore");
   }
   await fs.mkdir(path.join(root, ".code-doctor", "output"), { recursive: true });
+  created.push(...await initializeKnowledge(root));
   return created;
 };
 
-const CI_JOB = `code-doctor-daily:
+const MR_JOB = `code-doctor-mr-audit:
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  variables:
+    GIT_DEPTH: "0"
+  before_script:
+    - npm install --global @thunder-doctor/code-doctor
+  script:
+    - code-doctor audit --changed "$CI_MERGE_REQUEST_DIFF_BASE_SHA...$CI_COMMIT_SHA"
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - .code-doctor/output/
+`;
+
+const DAILY_JOB = `code-doctor-daily-audit:
   stage: test
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
@@ -44,7 +67,7 @@ const CI_JOB = `code-doctor-daily:
   before_script:
     - npm install --global @thunder-doctor/code-doctor
   script:
-    - code-doctor run --one --open-mr
+    - code-doctor audit --deep --one
   artifacts:
     when: always
     expire_in: 90 days
@@ -52,12 +75,40 @@ const CI_JOB = `code-doctor-daily:
       - .code-doctor/output/
 `;
 
-export const installGitLabCi = async (root: string): Promise<string[]> => {
+const PUSH_JOB = `code-doctor-push-audit:
+  stage: test
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BEFORE_SHA != "0000000000000000000000000000000000000000"'
+  variables:
+    GIT_DEPTH: "0"
+  before_script:
+    - npm install --global @thunder-doctor/code-doctor
+  script:
+    - code-doctor audit --changed "$CI_COMMIT_BEFORE_SHA...$CI_COMMIT_SHA"
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - .code-doctor/output/
+`;
+
+export type CiMode = "mr" | "push" | "daily" | "both" | "all";
+
+export const installGitLabCi = async (root: string, mode: CiMode = "both"): Promise<string[]> => {
   const written: string[] = [];
   const directory = path.join(root, ".gitlab");
   const jobFile = path.join(directory, "code-doctor.yml");
   await fs.mkdir(directory, { recursive: true });
-  await fs.writeFile(jobFile, CI_JOB, "utf8");
+  const jobs = mode === "mr"
+    ? MR_JOB
+    : mode === "push"
+      ? PUSH_JOB
+      : mode === "daily"
+        ? DAILY_JOB
+        : mode === "all"
+          ? `${MR_JOB}\n${PUSH_JOB}\n${DAILY_JOB}`
+          : `${MR_JOB}\n${DAILY_JOB}`;
+  await fs.writeFile(jobFile, jobs, "utf8");
   written.push(".gitlab/code-doctor.yml");
 
   const rootCi = path.join(root, ".gitlab-ci.yml");

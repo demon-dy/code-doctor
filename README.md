@@ -38,14 +38,87 @@ npm install --global @thunder-doctor/code-doctor
 
 cd your-project
 code-doctor init
+code-doctor map discover
+code-doctor takeover start --owner "新Owner"
 code-doctor scan
 code-doctor graph
-code-doctor map build --focus "首页会员弹窗"
+code-doctor map build --focus "首页会员弹窗" --id home-popup
+code-doctor map confirm home-popup --by "业务Owner"
 code-doctor map open
 code-doctor map check "会员到期用户必须看到续费弹窗"
 code-doctor map open --report
 code-doctor run --one --open-mr
 ```
+
+## 项目长期知识
+
+项目只需要执行一次 `code-doctor init`。初始化会创建可提交到 Git 的长期知识目录：
+
+```text
+.code-doctor/
+├── knowledge/                       # 长期沉淀，建议提交 Git
+│   ├── project.yaml                 # 项目定位（初始为空，避免 AI 猜业务事实）
+│   ├── project.candidate.yaml       # map discover 生成的待审项目定位
+│   ├── atlas.yaml                   # 业务场景目录与学习依赖
+│   ├── scenarios/
+│   │   ├── home-popup.candidate.json # AI 候选，尚未人工确认
+│   │   └── vip-renewal.json          # 已经过人工 review
+│   ├── rules.yaml                   # 人工确认的期望业务规则
+│   ├── questions.yaml               # 待历史 Owner / 产品确认的问题
+│   └── takeover.yaml                # 新 Owner 的渐进式接管进度
+├── cache/                           # 可重建，不提交
+├── snapshots/                       # 临时基线，不提交
+└── output/                          # HTML、报告、Agent 日志，不提交
+```
+
+Code Doctor 明确区分三种真相：
+
+- 实现真相：代码现在实际做什么；
+- 业务真相：人类确认它应该做什么；
+- 运行真相：测试、日志和线上实际发生什么。
+
+AI 产物首先保存为 `*.candidate.json`。只有人工 review 后才能提升为项目知识：
+
+```bash
+code-doctor map confirm home-popup --by "业务Owner"
+```
+
+确认整个场景不等于把所有 AI 推断改成事实；节点仍然保留 fact、inference、unknown、conflicted 等证据状态。
+
+人工确认的“应该如何运行”通过规则单独沉淀，并会自动进入 MR 和每日审计上下文：
+
+```bash
+code-doctor rule add \
+  --id vip-expire-daily-limit \
+  --scenario home-popup \
+  --statement "会员过期弹窗每天最多自动展示一次" \
+  --by "业务Owner"
+
+code-doctor rule list --scenario home-popup
+```
+
+没有人工确认规则时，Agent 只能报告实现风险，不能把自己的推断说成产品需求错误。
+
+## 渐进式项目接管
+
+新 Owner 不需要先知道应该检查什么。先让 Agent 从整个项目发现 6～20 个候选业务场景：
+
+```bash
+code-doctor map discover
+code-doctor takeover start --owner "新Owner"
+code-doctor takeover next
+```
+
+`map discover` 只建立候选目录和学习依赖，不会把项目文件夹直接当成业务。`takeover next` 优先推荐关键、依赖已满足的场景；场景尚未建图时会给出对应的 `map build` 命令。
+
+完成理解后由 Owner 自己确认：
+
+```bash
+code-doctor takeover confirm home-popup --by "新Owner"
+code-doctor takeover progress
+```
+
+“Owner 已理解”与“业务地图已人工确认”分别记录，避免将学习进度误当成业务真相。
 
 ## AI 业务地图
 
@@ -123,6 +196,8 @@ businessMap:
   enabled: true
   maxNodes: 80
   maxEvidence: 200
+audit:
+  maxScenariosPerRun: 3
 gitlab:
   enabled: true
   remote: origin
@@ -169,18 +244,41 @@ scanners:
 }
 ```
 
-## GitLab 定时执行
+## 持续审计与 GitLab CI
+
+人工触发：
 
 ```bash
-code-doctor ci install
+# 只审计某次 Git 变更实际影响的已沉淀场景
+code-doctor audit --changed origin/main...HEAD
+
+# 每天深入检查一个历史业务场景
+code-doctor audit --deep --one
 ```
 
-提交生成的 `.gitlab/code-doctor.yml` 后，在 GitLab 的 **CI/CD → Schedules** 中创建每日 Pipeline。CI 需要：
+变更文件通过场景地图中的源码证据关联到业务场景。没有被任何场景覆盖的变更不会伪装成“无影响”，而会明确记为知识覆盖缺口。
+
+GitLab 可以选择 MR、每日或两种模式同时安装：
+
+```bash
+code-doctor ci install --mode both
+# 也可以使用 --mode mr、push、daily 或 all
+```
+
+生成的 CI 默认执行：
+
+- Merge Request：`audit --changed "$CI_MERGE_REQUEST_DIFF_BASE_SHA...$CI_COMMIT_SHA"`；
+- 每次 Push：`audit --changed "$CI_COMMIT_BEFORE_SHA...$CI_COMMIT_SHA"`；
+- Schedule：`audit --deep --one`；
+- Web Pipeline：可手动触发每日深度审计。
+
+`both` 表示 MR + 每日，`all` 表示 MR + 每次 Push + 每日。提交生成的 `.gitlab/code-doctor.yml` 后，如启用 daily 模式，在 GitLab 的 **CI/CD → Schedules** 中创建每日 Pipeline。CI 需要：
 
 - 能访问 GitHub 并安装 Code Doctor；
 - 可用的 `CODEX_API_KEY`、`ANTHROPIC_API_KEY` 或自定义 Agent 凭证；
-- 允许推送 `code-doctor/*` 分支并创建 MR 的 GitLab Token；
 - 目标项目依赖和测试环境。
+
+持续审计只读代码并生成 Artifact，不需要推送权限。只有继续使用旧的 `run --one --open-mr` 自动修复流程时，才需要允许推送 `code-doctor/*` 分支和创建 MR 的 GitLab Token。
 
 默认模板从 npmjs 公开包安装，不需要读取私有 npm Registry。
 
@@ -215,6 +313,11 @@ open .code-doctor/output/graph.html
 diagnostics.json
 graph.json
 graph.html
+business-map.json
+business-map.html
+audit-index.json
+audit-report.<scenario-id>.json
+audit-report.<scenario-id>.html
 run.json
 verification-baseline.json
 verification.json

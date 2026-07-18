@@ -5,8 +5,17 @@ import vm from "node:vm";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildBusinessMap } from "../src/business-map/build.js";
 import { checkBusinessRequirement } from "../src/business-map/check.js";
+import { discoverBusinessScenarios } from "../src/business-map/discover.js";
 import { finalizeBusinessMap } from "../src/business-map/schema.js";
 import { DEFAULT_CONFIG } from "../src/defaults.js";
+import {
+  confirmScenario,
+  confirmTakeoverScenario,
+  listScenarios,
+  nextTakeoverScenario,
+  startTakeover,
+  takeoverProgress,
+} from "../src/knowledge.js";
 
 const directories: string[] = [];
 
@@ -23,7 +32,13 @@ describe("AI business map", () => {
       path.join(root, "agent.mjs"),
       `import fs from 'node:fs';
 const prompt = fs.readFileSync(process.argv[2], 'utf8');
-if (prompt.includes('map-task.json')) {
+if (prompt.includes('discover-task.json')) {
+  const task = JSON.parse(fs.readFileSync('.code-doctor/discover-task.json', 'utf8'));
+  fs.writeFileSync(task.candidateFile, JSON.stringify({
+    projectSummary: '一个根据会员状态选择弹窗的应用',
+    scenarios: [{ id: 'home-popup', title: '首页弹窗', focus: '首页弹窗选择与展示条件', summary: '用户进入首页后按会员状态展示弹窗', priority: 'critical', dependsOn: [], evidenceFiles: ['app.ts'] }]
+  }));
+} else if (prompt.includes('map-task.json')) {
   const task = JSON.parse(fs.readFileSync('.code-doctor/map-task.json', 'utf8'));
   fs.writeFileSync(task.candidateFile, JSON.stringify({
     title: '弹窗业务', summary: '根据会员到期状态选择弹窗',
@@ -57,12 +72,23 @@ if (prompt.includes('map-task.json')) {
       graph: { ...DEFAULT_CONFIG.graph, include: ["**/*.ts"] },
     };
 
-    const built = await buildBusinessMap({ root, config, focus: "首页弹窗" });
+    const discovered = await discoverBusinessScenarios({ root, config });
+    expect(discovered.scenarios).toEqual([expect.objectContaining({ id: "home-popup", priority: "critical", status: "candidate" })]);
+    expect(await fs.readFile(path.join(root, ".code-doctor", "knowledge", "project.candidate.yaml"), "utf8")).toContain("一个根据会员状态选择弹窗的应用");
+    const built = await buildBusinessMap({ root, config, focus: "首页弹窗", scenarioId: "home-popup" });
     expect(built.map.nodes).toHaveLength(3);
     expect(built.map.evidence[0]?.location).toEqual({ file: "app.ts", line: 1, column: undefined });
     const mapHtml = await fs.readFile(built.htmlFile, "utf8");
     expect(mapHtml).toContain("AI 业务地图");
     expect(() => new vm.Script(mapHtml.match(/<script>([\s\S]*)<\/script>/)?.[1] ?? "")).not.toThrow();
+    expect(built.knowledge?.id).toBe("home-popup");
+    expect((await listScenarios(root))[0]).toMatchObject({ id: "home-popup", status: "candidate", candidateAvailable: true });
+    const reviewed = await confirmScenario({ root, id: "home-popup", reviewer: "owner-a" });
+    expect(reviewed).toMatchObject({ status: "reviewed", reviewedBy: "owner-a" });
+    await startTakeover(root, "new-owner");
+    expect(await nextTakeoverScenario(root)).toMatchObject({ id: "home-popup", status: "in_progress" });
+    await confirmTakeoverScenario({ root, id: "home-popup", owner: "new-owner" });
+    expect(await takeoverProgress(root)).toMatchObject({ total: 1, understood: 1, percent: 100 });
 
     const checked = await checkBusinessRequirement({ root, config, requirement: "到期会员必须看到续费弹窗" });
     expect(checked.report.findings[0]).toMatchObject({ status: "satisfied", confidence: 0.98 });

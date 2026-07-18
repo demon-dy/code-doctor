@@ -12,6 +12,7 @@ const mergeConfig = (input: Partial<CodeDoctorConfig>): CodeDoctorConfig => ({
   agent: { ...DEFAULT_CONFIG.agent, ...input.agent },
   graph: { ...DEFAULT_CONFIG.graph, ...input.graph },
   businessMap: { ...DEFAULT_CONFIG.businessMap, ...input.businessMap },
+  audit: { ...DEFAULT_CONFIG.audit, ...input.audit },
   gitlab: { ...DEFAULT_CONFIG.gitlab, ...input.gitlab },
   limits: { ...DEFAULT_CONFIG.limits, ...input.limits },
   scanners: input.scanners ?? DEFAULT_CONFIG.scanners,

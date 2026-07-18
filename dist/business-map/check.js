@@ -21,19 +21,27 @@ const checkPrompt = (taskFile) => `你是 Code Doctor 的 AI 业务代码审计 
 JSON 必须满足任务文件中的 outputContract。`;
 export const checkBusinessRequirement = async (input) => {
     const output = await ensureOutputDirectory(input.root);
-    const mapFile = path.join(output, "business-map.json");
+    const artifactId = input.artifactId?.trim().toLowerCase().replaceAll(/[^a-z0-9_-]+/g, "-").replaceAll(/^-+|-+$/g, "");
+    const suffix = artifactId ? `.${artifactId}` : "";
+    const mapFile = path.join(output, `business-map${suffix}.json`);
     let map;
-    try {
-        map = JSON.parse(await fs.readFile(mapFile, "utf8"));
+    if (input.map) {
+        map = input.map;
+        await writeJson(mapFile, map);
     }
-    catch (error) {
-        if (error.code === "ENOENT")
-            throw new Error("尚未生成业务地图，请先运行 code-doctor map build --focus <业务场景>");
-        throw new Error(`无法读取业务地图：${error.message}`);
+    else {
+        try {
+            map = JSON.parse(await fs.readFile(path.join(output, "business-map.json"), "utf8"));
+        }
+        catch (error) {
+            if (error.code === "ENOENT")
+                throw new Error("尚未生成业务地图，请先运行 code-doctor map build --focus <业务场景>");
+            throw new Error(`无法读取业务地图：${error.message}`);
+        }
     }
-    const candidateFile = path.join(output, "audit-report.candidate.json");
-    const taskFile = path.join(input.root, ".code-doctor", "check-task.json");
-    const promptFile = path.join(input.root, ".code-doctor", "check-prompt.md");
+    const candidateFile = path.join(output, `audit-report${suffix}.candidate.json`);
+    const taskFile = path.join(input.root, ".code-doctor", `check${artifactId ? `-${artifactId}` : ""}-task.json`);
+    const promptFile = path.join(input.root, ".code-doctor", `check${artifactId ? `-${artifactId}` : ""}-prompt.md`);
     await fs.rm(candidateFile, { force: true });
     await writeJson(taskFile, {
         schemaVersion: 1,
@@ -51,7 +59,7 @@ export const checkBusinessRequirement = async (input) => {
     });
     await fs.writeFile(promptFile, `${checkPrompt(taskFile)}\n`, "utf8");
     const sourceState = await captureBusinessSourceState(input.root);
-    const agent = await runConfiguredAgent({ root: input.root, config: input.config.agent, promptFile, artifactPrefix: "check" });
+    const agent = await runConfiguredAgent({ root: input.root, config: input.config.agent, promptFile, artifactPrefix: artifactId ? `check-${artifactId}` : "check" });
     await assertBusinessSourceUnchanged(input.root, sourceState);
     if (agent.exitCode !== 0)
         throw new Error(`业务审计 Agent 执行失败，退出码 ${agent.exitCode}`);
@@ -65,8 +73,8 @@ export const checkBusinessRequirement = async (input) => {
         throw new Error(`业务审计 Agent 输出的 JSON 无效：${error.message}`);
     }
     const report = finalizeAuditReport({ candidate, root: input.root, requirement: input.requirement, map, agent });
-    const reportFile = path.join(output, "audit-report.json");
-    const htmlFile = path.join(output, "audit-report.html");
+    const reportFile = path.join(output, `audit-report${suffix}.json`);
+    const htmlFile = path.join(output, `audit-report${suffix}.html`);
     await writeJson(reportFile, report);
     await fs.writeFile(htmlFile, renderAuditReport(map, report), "utf8");
     await fs.rm(candidateFile, { force: true });
