@@ -29,3 +29,4 @@
 - M3：`npm run check` 通过（11 个测试文件、25 个测试）；诊室 2/15 场景真实 AI 审计生成 6 个结构复核项和 6 个业务语义候选，其中 4 项满足节点与强证据门槛标为 risk，13 个未建图场景继续明确显示为盲区。
 - M4：`npm run check` 通过（12 个测试文件、30 个测试）；Git 参数使用无 shell 的参数数组，覆盖删除/重命名、未归属和恢复状态；诊室真实 `HEAD...HEAD` 验证为 0 变更且未误重建地图，impact 与 AI 审计聚合进同一 HTML；Daily CI 增加跨 Pipeline 知识与进度缓存。
 - M5：`npm run check` 通过（13 个测试文件、33 个测试）；在仓库外临时目录真实安装 npm tarball，独立 TS/JS/Vue、Go、空项目/无 Agent 均跑通 CLI 与单 HTML；新增 `project start`、`project doctor --json`，诊室自检正确报告 15/2/0 覆盖与可用 Agent。
+- M6（发布待完成）：诊室真实项目已完成 15/15 场景建图，累计 88 个章节、417 个节点、477 条路径、562 条证据，`buildPending=0`、`buildFailed=0`；全局 AI 审计成功并识别 10 项有证据风险、64 项待复核。最终 `npm run check` 通过（13 个测试文件、34 个测试及真实 tarball 安装 E2E），Tesla 业务源码无新增修改。待 npm 重新授权后发布 `0.5.0`、打 tag，方可勾选 M6。
