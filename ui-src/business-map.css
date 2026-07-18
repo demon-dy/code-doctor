@@ -66,8 +66,10 @@ button { color: inherit; }
 .evidence-kind { font-weight: 800; }
 
 .react-flow__node { transition: opacity 180ms ease, filter 180ms ease; }
+.react-flow__node.is-preparing { opacity: 0; pointer-events: none; }
 .react-flow__node.is-dimmed { opacity: .09; filter: grayscale(.8); }
 .react-flow__edge { transition: opacity 180ms ease; }
+.react-flow__edge.is-preparing { opacity: 0; }
 .react-flow__edge.is-dimmed { opacity: .035; }
 .react-flow__edge.is-emphasized { opacity: 1; }
 .react-flow__edge-path { stroke: #58635e; stroke-width: 2.15; }
@@ -82,17 +84,18 @@ button { color: inherit; }
 .react-flow__minimap { border: 1px solid var(--line); border-radius: 0; background: #e9e6de; box-shadow: none; }
 .react-flow__attribution { font-size: 8px; opacity: .55; }
 
-.business-node { position: relative; display: flex; flex-direction: column; width: 100%; height: 100%; padding: 12px 14px; border: 1px solid #aaa69c; background: #fffefa; box-shadow: 0 5px 14px rgba(48, 45, 38, .08); }
+.business-node { position: relative; display: flex; flex-direction: column; width: 292px; min-height: 118px; padding: 13px 15px 15px; border: 1px solid #aaa69c; background: #fffefa; box-shadow: 0 5px 14px rgba(48, 45, 38, .08); }
 .business-node.is-selected { outline: 3px solid rgba(43, 66, 56, .2); outline-offset: 3px; border-color: #344f44; }
 .node-heading { display: flex; align-items: center; gap: 7px; min-height: 22px; }
 .kind-glyph { display: grid; place-items: center; width: 22px; height: 22px; border: 1px solid currentColor; border-radius: 50%; font-size: 10px; font-weight: 800; }
 .kind-label { color: #5f645f; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
 .status-chip { margin-left: auto; padding: 2px 6px; border: 1px solid currentColor; background: #fffefa; font-size: 9px; font-weight: 800; }
-.node-title { display: -webkit-box; margin-top: 8px; overflow: hidden; font-size: 14px; font-weight: 750; line-height: 1.25; -webkit-box-orient: vertical; }
-.node-summary { display: -webkit-box; flex: 0 0 auto; margin-top: 5px; overflow: hidden; color: #686d68; font-size: 10.5px; line-height: 1.4; -webkit-box-orient: vertical; }
+.node-title { margin-top: 9px; font-size: 14px; font-weight: 750; line-height: 1.35; overflow-wrap: anywhere; }
+.node-summary { margin-top: 7px; color: #5f655f; font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
 .business-handle { width: 9px; height: 9px; border: 2px solid #fffefa; background: #515c57; }
 .kind-actor { color: #715d91; }
 .business-node.kind-actor { border-radius: 44px 8px 8px 44px; background: #f6f1fb; }
+.business-node.kind-actor { width: 276px; padding-left: 28px; }
 .kind-scenario { color: #315f89; }
 .business-node.kind-scenario { clip-path: polygon(0 0, 92% 0, 100% 18%, 100% 100%, 0 100%); background: #f0f5f9; }
 .kind-action { color: #2e715e; }
@@ -132,6 +135,7 @@ button { color: inherit; }
 .canvas-actions { display: flex; gap: 6px; padding: 4px; border: 1px solid var(--line); background: rgba(255, 253, 248, .95); box-shadow: 0 8px 20px rgba(40, 38, 32, .1); }
 .canvas-actions button { padding: 6px 9px; border: 0; background: transparent; color: #555b55; font-size: 10px; cursor: pointer; }
 .canvas-actions button:hover { background: #ece9e1; color: var(--ink); }
+.canvas-actions button:disabled { cursor: wait; opacity: .45; }
 
 @media (max-width: 1100px) {
   .workspace { grid-template-columns: minmax(0, 1fr) 310px; }
