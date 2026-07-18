@@ -48,4 +48,34 @@ describe("analyzeCodeGraph", () => {
     expect(graph.nodes.some((node) => node.id === "endpoint:GET:/api/orders/:param")).toBe(true);
     expect(graph.edges.some((edge) => edge.from.endsWith(":getOrder") && edge.to.endsWith(":findOrder"))).toBe(true);
   });
+
+  it("解析 JavaScript、Vue script 和 @ 路径导入", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "code-doctor-vue-"));
+    directories.push(root);
+    await fs.mkdir(path.join(root, "src", "api"), { recursive: true });
+    await fs.writeFile(
+      path.join(root, "src", "api", "orders.js"),
+      `export const loadOrders = () => client.get("/api/orders");\nexport const featureFlag = () => store.get("feature-flag");\n`,
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(root, "src", "Orders.vue"),
+      `<template><main>orders</main></template>\n<script setup>\nimport { loadOrders } from "@/api/orders";\nconst refresh = () => loadOrders();\n</script>\n`,
+      "utf8",
+    );
+
+    const graph = await analyzeCodeGraph({ root, config: DEFAULT_CONFIG });
+
+    expect(graph.stats.files).toBe(2);
+    expect(graph.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "file:src/Orders.vue", language: "javascript" }),
+      expect.objectContaining({ id: "function:src/Orders.vue:refresh", location: { file: "src/Orders.vue", line: 4 } }),
+      expect.objectContaining({ id: "endpoint:GET:/api/orders" }),
+    ]));
+    expect(graph.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ from: "file:src/Orders.vue", to: "file:src/api/orders.js", kind: "import" }),
+      expect.objectContaining({ from: "file:src/api/orders.js", to: "endpoint:GET:/api/orders", kind: "http" }),
+    ]));
+    expect(graph.nodes.some((node) => node.id === "endpoint:GET:/feature-flag")).toBe(false);
+  });
 });

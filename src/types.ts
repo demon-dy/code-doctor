@@ -88,7 +88,7 @@ export interface GraphNode {
   id: string;
   label: string;
   kind: GraphNodeKind;
-  language?: "typescript" | "go";
+  language?: "typescript" | "javascript" | "go";
   location?: SourceLocation;
   metadata?: Record<string, unknown>;
 }

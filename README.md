@@ -2,7 +2,7 @@
 
 Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大，以及客户端到服务端调用链难以理解的问题。
 
-它是一个轻量 CLI：复用项目已有扫描器，每次只选择一个问题交给 Codex、Claude Code 或自定义 Agent 修复；验证通过后创建 GitLab MR，并生成可搜索的 TS/Go 静态调用图供人类审核和排障。
+它是一个轻量 CLI：复用项目已有扫描器，每次只选择一个问题交给 Codex、Claude Code 或自定义 Agent 修复；验证通过后创建 GitLab MR，并生成可搜索的 JS/TS/Vue/Go 静态调用图供人类审核和排障。
 
 本项目采用 MIT License，可供团队和社区自由使用，并以 `@thunder-doctor/code-doctor` 发布到 npmjs。
 
@@ -10,10 +10,11 @@ Code Doctor 解决历史代码问题持续堆积、AI 一次修改范围过大�
 
 - 自动发现 React Doctor、ESLint、TypeScript、staticcheck、golangci-lint 或 go vet。
 - 统一解析 React Doctor、ESLint、TypeScript、Go、SARIF 和通用 JSON 诊断。
-- 每次只选择一个可修复诊断，并限制修改文件数和代码行数。
+- 每次只选择一个诊断交给 AI，扫描器的 `fixable` 标记仅作审计信息，不限制 AI 候选。
 - 自动选择本机 Codex 或 Claude Code，也支持任何自定义 Agent 命令。
-- 修复后重新扫描并执行项目测试，通过后提交分支并可创建 GitLab MR。
-- 分析 TypeScript/TSX 和 Go 的文件依赖、函数调用、HTTP 请求和服务端路由。
+- 扫描器缺失、超时或异常退出时明确失败，不会伪装成“零问题”。
+- 修复前后都执行项目验证：原本通过的门禁不得退化，历史基线失败不会阻止独立修复。
+- 分析 JavaScript、TypeScript、Vue SFC 和 Go 的文件依赖、函数调用、HTTP 请求和服务端路由。
 - 输出 `graph.json` 和单文件 `graph.html`，不需要部署后台。
 - 保存扫描、Agent 输出、测试、调用图和运行结论作为 CI Artifact。
 
@@ -56,6 +57,9 @@ graph:
   include:
     - "**/*.ts"
     - "**/*.tsx"
+    - "**/*.js"
+    - "**/*.jsx"
+    - "**/*.vue"
     - "**/*.go"
 gitlab:
   enabled: true
@@ -116,7 +120,7 @@ code-doctor ci install
 - 允许推送 `code-doctor/*` 分支并创建 MR 的 GitLab Token；
 - 目标项目依赖和测试环境。
 
-默认模板从公开 GitHub Release tarball 安装，不需要读取私有 npm Registry。
+默认模板从 npmjs 公开包安装，不需要读取私有 npm Registry。
 
 系统不会自动合并 MR。
 
@@ -129,8 +133,9 @@ open .code-doctor/output/graph.html
 
 当前确定性提取：
 
-- TS/TSX 相对路径 import；
-- TS 函数和方法调用；
+- JS/TS/JSX/TSX 相对路径 import 与 Vue 常用的 `@/` 路径；
+- Vue SFC 的 `<script>` / `<script setup>`；
+- JS/TS 函数和方法调用；
 - `fetch`、Axios 风格 HTTP 调用；
 - Express/Fastify 风格路由；
 - NestJS `Controller` 与 HTTP 方法装饰器；
@@ -149,6 +154,8 @@ diagnostics.json
 graph.json
 graph.html
 run.json
+verification-baseline.json
+verification.json
 agent-stdout.jsonl
 agent-stderr.log
 ```
@@ -162,5 +169,5 @@ agent-stderr.log
 - 默认最多修改 6 个文件、250 行。
 - Agent 不负责提交、推送和创建 MR。
 - 原诊断必须在重新扫描后消失。
-- 项目验证命令必须通过。
+- 修改前通过的项目验证命令，修改后必须继续通过；已有失败会记录为基线。
 - MR 必须由人类审核，不自动合并。

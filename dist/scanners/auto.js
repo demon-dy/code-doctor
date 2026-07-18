@@ -10,21 +10,21 @@ export const discoverScanners = async (root) => {
         if (packages["react-doctor"]) {
             scanners.push({
                 name: "react-doctor",
-                command: "npx --no-install react-doctor --json",
+                command: "./node_modules/.bin/react-doctor --json",
                 parser: "react-doctor",
             });
         }
         if (packages.eslint) {
             scanners.push({
                 name: "eslint",
-                command: "npx --no-install eslint . --format json",
+                command: "./node_modules/.bin/eslint . --format json",
                 parser: "eslint",
             });
         }
         if (packages.typescript && (await pathExists(path.join(root, "tsconfig.json")))) {
             scanners.push({
                 name: "typescript",
-                command: "npx --no-install tsc --noEmit --pretty false",
+                command: "./node_modules/.bin/tsc --noEmit --pretty false",
                 parser: "tsc",
             });
         }

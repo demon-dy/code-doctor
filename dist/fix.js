@@ -2,7 +2,7 @@ import path from "node:path";
 import { createRepairTask, runRepairAgent } from "./agent.js";
 import { assertCleanWorktree, changedStats, commitDoctorFix, createDoctorBranch, currentBranch, pushAndCreateMergeRequest, restoreBranch, } from "./git.js";
 import { runCommand } from "./process.js";
-import { scanProject, selectOneDiagnostic } from "./scan.js";
+import { assertScanSucceeded, scanProject, selectOneDiagnostic } from "./scan.js";
 import { ensureOutputDirectory, makeRunId, writeJson } from "./utils.js";
 const discoverVerificationCommands = async (root, configured) => {
     if (configured.length)
@@ -30,21 +30,26 @@ const discoverVerificationCommands = async (root, configured) => {
         commands.push("go test ./...");
     return commands;
 };
-const runVerification = async (root, commands) => {
+const runVerification = async (root, commands, baseline) => {
     const results = [];
-    for (const command of commands) {
+    for (const [index, command] of commands.entries()) {
         const result = await runCommand({ command, cwd: root, timeoutMs: 900_000 });
+        const baselineResult = baseline?.results[index];
+        const baselineExitCode = baselineResult?.exitCode;
+        const passed = !result.timedOut && (result.exitCode === 0 ||
+            (baselineExitCode !== undefined && baselineExitCode !== 0 && baselineResult?.timedOut === false));
         results.push({
             command,
             exitCode: result.exitCode,
+            baselineExitCode,
+            passed,
+            timedOut: result.timedOut,
             durationMs: result.durationMs,
             stdout: result.stdout,
             stderr: result.stderr,
         });
-        if (result.exitCode !== 0)
-            return { passed: false, results };
     }
-    return { passed: true, results };
+    return { passed: results.every((result) => result.passed), results };
 };
 export const fixOneIssue = async (input) => {
     const runId = makeRunId();
@@ -64,6 +69,7 @@ export const fixOneIssue = async (input) => {
         await assertCleanWorktree(input.root);
         originalBranch = await currentBranch(input.root);
         const before = await scanProject({ root: input.root, config: input.config });
+        assertScanSucceeded(before);
         record.beforeCount = before.diagnostics.length;
         const selected = selectOneDiagnostic(before);
         if (!selected) {
@@ -75,6 +81,8 @@ export const fixOneIssue = async (input) => {
         const verificationCommands = await discoverVerificationCommands(input.root, input.config.verify);
         const branch = await createDoctorBranch(input.root, selected);
         record.branch = branch;
+        const verificationBaseline = await runVerification(input.root, verificationCommands);
+        await writeJson(path.join(output, "verification-baseline.json"), verificationBaseline);
         const task = await createRepairTask({
             root: input.root,
             diagnostic: selected,
@@ -105,11 +113,12 @@ export const fixOneIssue = async (input) => {
             throw new Error(`修改行数 ${stats.added + stats.deleted} 超过限制 ${input.config.limits.maxChangedLines}`);
         }
         const after = await scanProject({ root: input.root, config: input.config });
+        assertScanSucceeded(after);
         record.afterCount = after.diagnostics.length;
         record.resolved = !after.diagnostics.some((diagnostic) => diagnostic.id === selected.id);
         if (!record.resolved)
             throw new Error("重新扫描后原诊断仍然存在");
-        const verification = await runVerification(input.root, verificationCommands);
+        const verification = await runVerification(input.root, verificationCommands, verificationBaseline);
         await writeJson(path.join(output, "verification.json"), verification);
         record.verificationPassed = verification.passed;
         if (!record.verificationPassed)

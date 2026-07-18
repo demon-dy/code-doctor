@@ -4,4 +4,6 @@ export declare const scanProject: (input: {
     config: CodeDoctorConfig;
     writeReport?: boolean;
 }) => Promise<ScanReport>;
+export declare const scanFailureMessages: (report: ScanReport) => string[];
+export declare const assertScanSucceeded: (report: ScanReport) => void;
 export declare const selectOneDiagnostic: (report: ScanReport) => Diagnostic | undefined;

@@ -12,6 +12,9 @@ const uniqueDiagnostics = (diagnostics) => {
         return true;
     });
 };
+const failureSummary = (stdout, stderr) => (stderr.trim() || stdout.trim() || "没有错误输出")
+    .replaceAll(/\s+/g, " ")
+    .slice(0, 500);
 const resolveScanners = async (root, config) => {
     const configured = config.scanners.filter((scanner) => scanner.enabled !== false);
     const discovered = await discoverScanners(root);
@@ -41,8 +44,14 @@ export const scanProject = async (input) => {
         }
         catch (parseError) {
             error = `无法解析扫描结果：${parseError.message}`;
+            if (result.exitCode !== 0) {
+                error += `；扫描器退出码 ${result.exitCode}：${failureSummary(result.stdout, result.stderr)}`;
+            }
         }
         diagnostics.push(...parsed);
+        if (!error && result.exitCode !== 0 && parsed.length === 0) {
+            error = `扫描器退出码 ${result.exitCode}：${failureSummary(result.stdout, result.stderr)}`;
+        }
         scannerRuns.push({
             name: scanner.name,
             command: scanner.command,
@@ -72,5 +81,11 @@ export const scanProject = async (input) => {
     }
     return report;
 };
-export const selectOneDiagnostic = (report) => report.diagnostics.find((diagnostic) => diagnostic.fixable);
+export const scanFailureMessages = (report) => report.scanners.flatMap((scanner) => scanner.error ? [`${scanner.name}: ${scanner.error}`] : []);
+export const assertScanSucceeded = (report) => {
+    const failures = scanFailureMessages(report);
+    if (failures.length)
+        throw new Error(`扫描失败：${failures.join("；")}`);
+};
+export const selectOneDiagnostic = (report) => report.diagnostics[0];
 //# sourceMappingURL=scan.js.map

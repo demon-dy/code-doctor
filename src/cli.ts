@@ -8,7 +8,7 @@ import { fixOneIssue } from "./fix.js";
 import { analyzeCodeGraph } from "./graph/analyze.js";
 import { writeGraphArtifacts } from "./graph/render.js";
 import { initializeProject, installGitLabCi } from "./init.js";
-import { scanProject } from "./scan.js";
+import { scanFailureMessages, scanProject } from "./scan.js";
 
 const rootOption = (command: Command): Command =>
   command.option("-C, --root <directory>", "项目根目录", process.cwd());
@@ -35,6 +35,7 @@ rootOption(program.command("scan").description("扫描整个历史代码库并�
     const root = resolveRoot(options.root);
     const config = await loadConfig(root);
     const report = await scanProject({ root, config });
+    const failures = scanFailureMessages(report);
     if (options.json) console.log(JSON.stringify(report));
     else {
       console.log(pc.bold(`发现 ${report.diagnostics.length} 个问题`));
@@ -43,10 +44,12 @@ rootOption(program.command("scan").description("扫描整个历史代码库并�
         console.log(`  ${diagnostic.message}`);
       }
       if (report.diagnostics.length > 20) console.log(pc.dim(`另有 ${report.diagnostics.length - 20} 个问题，详见 .code-doctor/output/diagnostics.json`));
+      for (const failure of failures) console.error(pc.red(`扫描失败：${failure}`));
     }
+    if (failures.length) process.exitCode = 1;
   });
 
-rootOption(program.command("graph").description("生成 TS/Go 静态调用图和可交互 HTML"))
+rootOption(program.command("graph").description("生成 JS/TS/Vue/Go 静态调用图和可交互 HTML"))
   .action(async (options: { root: string }) => {
     const root = resolveRoot(options.root);
     const config = await loadConfig(root);
@@ -68,13 +71,13 @@ addFixOptions(program.command("fix").description("选择一个历史问题并交
     const config = await loadConfig(root);
     if (options.agent) config.agent.provider = options.agent as typeof config.agent.provider;
     const record = await fixOneIssue({ root, config, openMergeRequest: options.openMr });
-    if (!record.selectedDiagnostic) {
-      console.log(pc.green("没有可自动修复的问题"));
-      return;
-    }
     if (record.error) {
       console.error(pc.red(`修复失败：${record.error}`));
       process.exitCode = 1;
+      return;
+    }
+    if (!record.selectedDiagnostic) {
+      console.log(pc.green("没有待处理问题"));
       return;
     }
     console.log(pc.green(`已修复 ${record.selectedDiagnostic.rule}`));
@@ -92,11 +95,11 @@ addFixOptions(program.command("run").description("扫描、画图、修复一个
       console.log(pc.dim(`调用图：${graph.stats.nodes} 个节点，${graph.stats.edges} 条边`));
     }
     const record = await fixOneIssue({ root, config, openMergeRequest: options.openMr });
-    if (!record.selectedDiagnostic) console.log(pc.green("没有可自动修复的问题"));
-    else if (record.error) {
+    if (record.error) {
       console.error(pc.red(`修复失败：${record.error}`));
       process.exitCode = 1;
-    } else {
+    } else if (!record.selectedDiagnostic) console.log(pc.green("没有待处理问题"));
+    else {
       console.log(pc.green(`已修复 ${record.selectedDiagnostic.rule}`));
       if (record.mergeRequestUrl) console.log(record.mergeRequestUrl);
     }

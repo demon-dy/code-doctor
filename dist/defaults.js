@@ -16,7 +16,18 @@ export const DEFAULT_CONFIG = {
     verify: [],
     graph: {
         enabled: true,
-        include: ["**/*.ts", "**/*.tsx", "**/*.go"],
+        include: [
+            "**/*.ts",
+            "**/*.tsx",
+            "**/*.mts",
+            "**/*.cts",
+            "**/*.js",
+            "**/*.jsx",
+            "**/*.mjs",
+            "**/*.cjs",
+            "**/*.vue",
+            "**/*.go",
+        ],
         exclude: [
             "**/node_modules/**",
             "**/dist/**",

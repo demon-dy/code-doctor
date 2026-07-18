@@ -15,8 +15,10 @@ const SKIPPED_DIRECTORIES = new Set([
   "vendor",
 ]);
 
-const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".go"]);
+const SCRIPT_EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs", ".vue"];
+const SOURCE_EXTENSIONS = new Set([...SCRIPT_EXTENSIONS, ".go"]);
 const HTTP_METHODS = new Set(["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"]);
+const looksLikeHttpRoute = (value: string): boolean => /^(?:https?:\/\/|\/)/i.test(value);
 
 interface FunctionRecord {
   id: string;
@@ -94,17 +96,47 @@ const literalText = (node: ts.Expression | undefined): string | undefined => {
   return undefined;
 };
 
+const vueScriptContent = (content: string): string => {
+  const output: string[] = [...content].map((character) => character === "\n" || character === "\r" ? character : " ");
+  const pattern = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+  for (const match of content.matchAll(pattern)) {
+    if (match.index === undefined || match[1] === undefined) continue;
+    const offset = match[0].indexOf(match[1]);
+    const start = match.index + offset;
+    for (let index = 0; index < match[1].length; index += 1) {
+      output[start + index] = match[1][index]!;
+    }
+  }
+  return output.join("");
+};
+
+const scriptKind = (file: string): ts.ScriptKind => {
+  if (file.endsWith(".tsx")) return ts.ScriptKind.TSX;
+  if (file.endsWith(".jsx")) return ts.ScriptKind.JSX;
+  if (file.endsWith(".js") || file.endsWith(".mjs") || file.endsWith(".cjs") || file.endsWith(".vue")) {
+    return ts.ScriptKind.JS;
+  }
+  return ts.ScriptKind.TS;
+};
+
+const scriptLanguage = (file: string, content: string): "typescript" | "javascript" =>
+  file.endsWith(".vue")
+    ? /<script\b[^>]*\blang=["']tsx?["']/i.test(content) ? "typescript" : "javascript"
+    : /\.(?:js|jsx|mjs|cjs)$/.test(file) ? "javascript" : "typescript";
+
 const resolveImportTarget = async (
   root: string,
   currentFile: string,
   specifier: string,
 ): Promise<string | undefined> => {
-  if (!specifier.startsWith(".")) return undefined;
-  const base = path.resolve(path.dirname(currentFile), specifier);
+  if (!specifier.startsWith(".") && !specifier.startsWith("@/")) return undefined;
+  const base = specifier.startsWith("@/")
+    ? path.resolve(root, "src", specifier.slice(2))
+    : path.resolve(path.dirname(currentFile), specifier);
   const candidates = [
     base,
-    ...[".ts", ".tsx", ".mts", ".cts"].map((extension) => `${base}${extension}`),
-    ...["index.ts", "index.tsx"].map((name) => path.join(base, name)),
+    ...SCRIPT_EXTENSIONS.map((extension) => `${base}${extension}`),
+    ...SCRIPT_EXTENSIONS.map((extension) => path.join(base, `index${extension}`)),
   ];
   for (const candidate of candidates) {
     try {
@@ -151,7 +183,7 @@ const addHttpEndpoint = (input: {
   route: string;
   kind: "http" | "route";
   handlerName?: string;
-  language: "typescript" | "go";
+  language: "typescript" | "javascript" | "go";
 }): void => {
   const method = input.method.toUpperCase();
   const route = normalizeRoute(input.route);
@@ -193,7 +225,7 @@ const addHttpEndpoint = (input: {
   }
 };
 
-const analyzeTypeScript = async (
+const analyzeScript = async (
   root: string,
   absoluteFile: string,
   collector: GraphCollector,
@@ -201,18 +233,20 @@ const analyzeTypeScript = async (
   const file = relative(root, absoluteFile);
   const fileNodeId = `file:${file}`;
   const content = await fs.readFile(absoluteFile, "utf8");
+  const analyzableContent = file.endsWith(".vue") ? vueScriptContent(content) : content;
+  const language = scriptLanguage(file, content);
   const sourceFile = ts.createSourceFile(
     file,
-    content,
+    analyzableContent,
     ts.ScriptTarget.Latest,
     true,
-    file.endsWith("x") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    scriptKind(file),
   );
   addNode(collector, {
     id: fileNodeId,
     label: file,
     kind: "file",
-    language: "typescript",
+    language,
     location: { file, line: 1 },
   });
 
@@ -227,7 +261,7 @@ const analyzeTypeScript = async (
         id: targetId,
         label: target,
         kind: "file",
-        language: "typescript",
+        language,
         location: { file: target, line: 1 },
       });
       addEdge(collector, {
@@ -251,7 +285,7 @@ const analyzeTypeScript = async (
         id,
         label: declaredName,
         kind: "function",
-        language: "typescript",
+        language,
         location: { file, line: nodeLine(sourceFile, node) },
       });
       addEdge(collector, {
@@ -279,7 +313,7 @@ const analyzeTypeScript = async (
             method: methodFromOptions(node.arguments[1]),
             route,
             kind: "http",
-            language: "typescript",
+            language,
           });
         }
       }
@@ -287,7 +321,7 @@ const analyzeTypeScript = async (
       if (ts.isPropertyAccessExpression(node.expression)) {
         const method = node.expression.name.text.toUpperCase();
         const route = literalText(node.arguments[0]);
-        if (route && HTTP_METHODS.has(method)) {
+        if (route && HTTP_METHODS.has(method) && looksLikeHttpRoute(route)) {
           const secondArgument = node.arguments[1];
           const looksLikeRoute = Boolean(
             secondArgument &&
@@ -302,7 +336,7 @@ const analyzeTypeScript = async (
             route,
             kind: looksLikeRoute ? "route" : "http",
             handlerName: secondArgument && ts.isIdentifier(secondArgument) ? secondArgument.text : undefined,
-            language: "typescript",
+            language,
           });
         }
       }
@@ -311,10 +345,10 @@ const analyzeTypeScript = async (
   };
   visit(sourceFile);
 
-  const controllerPrefix = content.match(/@Controller\(\s*["'`]([^"'`]*)["'`]\s*\)/)?.[1] ?? "";
+  const controllerPrefix = analyzableContent.match(/@Controller\(\s*["'`]([^"'`]*)["'`]\s*\)/)?.[1] ?? "";
   const decoratorPattern = /@(Get|Post|Put|Patch|Delete)\(\s*["'`]([^"'`]*)["'`]\s*\)\s*(?:public\s+|private\s+|protected\s+|async\s+)*([\w$]+)\s*\(/g;
-  for (const match of content.matchAll(decoratorPattern)) {
-    const line = content.slice(0, match.index).split(/\r?\n/).length;
+  for (const match of analyzableContent.matchAll(decoratorPattern)) {
+    const line = analyzableContent.slice(0, match.index).split(/\r?\n/).length;
     addHttpEndpoint({
       collector,
       fileNodeId,
@@ -324,7 +358,7 @@ const analyzeTypeScript = async (
       route: `/${controllerPrefix}/${match[2]}`,
       kind: "route",
       handlerName: match[3],
-      language: "typescript",
+      language,
     });
   }
 };
@@ -456,7 +490,7 @@ export const analyzeCodeGraph = async (input: {
   });
   for (const file of files) {
     if (file.endsWith(".go")) await analyzeGo(input.root, file, collector);
-    else await analyzeTypeScript(input.root, file, collector);
+    else await analyzeScript(input.root, file, collector);
   }
   connectFunctionCalls(collector);
   const nodes = [...collector.nodes.values()];
