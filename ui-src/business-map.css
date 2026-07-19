@@ -19,6 +19,9 @@ button, input { font: inherit; }
 button { color: inherit; }
 
 .app-shell { display: grid; grid-template-rows: 82px minmax(0, 1fr); height: 100%; }
+.app-shell.is-embedded { grid-template-rows: minmax(0, 1fr); }
+.app-shell.is-embedded .topbar { display: none; }
+.app-shell.is-embedded .workspace { height: 100%; }
 .topbar { z-index: 20; display: grid; grid-template-columns: minmax(280px, 1fr) auto minmax(250px, .72fr); align-items: center; gap: 22px; padding: 12px 18px 12px 22px; border-bottom: 1px solid var(--line); background: rgba(255, 253, 248, .96); }
 .brand-block { min-width: 0; display: flex; align-items: center; gap: 18px; }
 .brand { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--ink); font-size: 10px; font-weight: 800; letter-spacing: .16em; }

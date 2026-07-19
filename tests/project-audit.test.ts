@@ -74,7 +74,7 @@ describe("project business risk audit", () => {
     const projectReport = JSON.parse(await fs.readFile(result.reportFile, "utf8")) as { audit?: { findings: unknown[] } };
     expect(projectReport.audit?.findings.length).toBe(result.audit.findings.length);
     const html = await fs.readFile(result.htmlFile, "utf8");
-    expect(html).toContain("业务链风险与需复核项");
+    expect(html).toContain("优先复核的业务链风险");
     expect(html).toContain("AI 业务审计");
     expect(html).toContain("本场景风险与需复核项");
     expect(() => new vm.Script(html.match(/<script>([\s\S]*)<\/script>/)?.[1] ?? "")).not.toThrow();

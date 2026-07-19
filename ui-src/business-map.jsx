@@ -23,6 +23,7 @@ import "./business-map.css";
 import { collectFocusedSubgraph } from "../src/business-map/focus.ts";
 
 const map = window.__CODE_DOCTOR_MAP__;
+const embedded = Boolean(window.__CODE_DOCTOR_EMBEDDED__);
 const elk = new ELK();
 
 const kindMeta = {
@@ -42,6 +43,15 @@ const statusMeta = {
   inference: { label: "AI 推断", short: "推断" },
   unknown: { label: "证据未知", short: "未知" },
   conflicted: { label: "证据冲突", short: "冲突" },
+};
+
+const evidenceKindLabels = {
+  source: "源码",
+  test: "测试",
+  git: "Git 记录",
+  runtime: "运行证据",
+  human: "人工确认",
+  agent: "AI 分析",
 };
 
 const pathLabelId = (edgeId) => `__path_label__${edgeId}`;
@@ -283,7 +293,7 @@ function EvidenceList({ ids }) {
           if (!evidence) return null;
           return (
             <article className="evidence-item" key={id}>
-              <div><span className="evidence-kind">{evidence.kind}</span><span>{Math.round(evidence.confidence * 100)}%</span></div>
+              <div><span className="evidence-kind">{evidenceKindLabels[evidence.kind] ?? "未知证据"}</span><span>{Math.round(evidence.confidence * 100)}%</span></div>
               <p>{evidence.description}</p>
               {evidence.location && <code>{evidence.location.file}{evidence.location.line ? `:${evidence.location.line}` : ""}</code>}
             </article>
@@ -453,7 +463,7 @@ function MapCanvas({ chapter, selection, setSelection, onBack }) {
 
 function App() {
   const [selection, setSelection] = useState(null);
-  const [chapterId, setChapterId] = useState(null);
+  const [chapterId, setChapterId] = useState(() => embedded ? chapters[0]?.id ?? null : null);
   const [query, setQuery] = useState("");
   const chapter = chapters.find((item) => item.id === chapterId) ?? null;
 
@@ -499,7 +509,7 @@ function App() {
   };
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${embedded ? "is-embedded" : ""}`}>
       <header className="topbar">
         <div className="brand-block">
           <span className="brand">CODE DOCTOR</span>
@@ -540,4 +550,8 @@ function App() {
   );
 }
 
-createRoot(document.getElementById("code-doctor-map-root")).render(<App />);
+const mapHost = window.__CODE_DOCTOR_MAP_HOST__ ?? document.getElementById("code-doctor-map-root");
+window.__CODE_DOCTOR_ACTIVE_MAP_ROOT__?.unmount();
+const activeRoot = createRoot(mapHost);
+window.__CODE_DOCTOR_ACTIVE_MAP_ROOT__ = activeRoot;
+activeRoot.render(<App />);
